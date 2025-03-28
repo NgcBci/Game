@@ -1,4 +1,4 @@
-#ifndef _GRAPaHICS__H
+#ifndef _GRAPHICS__H
 #define _GRAPHICS__H
 #include <SDL.h>
 #include <SDL_image.h>
@@ -23,31 +23,25 @@ struct Particle {
 
 struct GameObject {
     double x, y, width, height;
-    double vx, vy;  // Velocity
-    double mass;    // Mass for physics
-    bool isGrabbable;
-    bool isFalling; // Flag to indicate if platform should fall
     SDL_Texture* texture;
+    bool isGrabbable;
 
-    GameObject(SDL_Renderer* renderer, double startX, double startY, double w, double h, bool grabbable = true, bool falling = false)
-        : x(startX), y(startY), width(w), height(h), vx(0), vy(0), mass(1.0), isGrabbable(grabbable), isFalling(falling)
+    GameObject(SDL_Renderer* renderer, double startX, double startY, double w, double h, bool grabbable = true)
+        : x(startX), y(startY), width(w), height(h), isGrabbable(grabbable)
     {
-        texture = IMG_LoadTexture(renderer, "F:\\Game\\platform.jpg");
-        if (!texture) std::cout << "Failed to load object texture";
+        const char* texturePath = "F:\\Game\\platform.png";
+        SDL_Surface* surface = IMG_Load(texturePath);
+        texture = SDL_CreateTextureFromSurface(renderer, surface);
+        SDL_FreeSurface(surface);
     }
 
     void update(double dt) {
-        if (isFalling) {
-            vy += 981.0 * dt;  // Apply gravity
-            y += vy * dt;      // Update position
-            x += vx * dt;      // Allow horizontal movement too
-        }
     }
 
     void render(SDL_Renderer* renderer) const {
         SDL_Rect destRect = {
-            static_cast<int>(x - width/2),
-            static_cast<int>(y - height/2),
+            static_cast<int>(x),
+            static_cast<int>(y),
             static_cast<int>(width),
             static_cast<int>(height)
         };
@@ -57,22 +51,30 @@ struct GameObject {
     ~GameObject() {
         if (texture) {
             SDL_DestroyTexture(texture);
+            texture = nullptr;
         }
     }
 };
 
+struct Platform {
+    SDL_Rect rect;
+    SDL_Texture* texture;
+
+    Platform(SDL_Rect r, SDL_Texture* t) : rect(r), texture(t) {}
+};
+
 struct Graphics {
     SDL_Renderer *renderer;
-	SDL_Window *window;
-    std::vector<GameObject> objects;
+    SDL_Window *window;
+    std::vector<Platform> platforms;
 
-	void logErrorAndExit(const char* msg, const char* error)
+    void logErrorAndExit(const char* msg, const char* error)
     {
         SDL_LogMessage(SDL_LOG_CATEGORY_APPLICATION, SDL_LOG_PRIORITY_ERROR, "%s: %s", msg, error);
         SDL_Quit();
     }
 
-	void init() {
+    void init() {
         if (SDL_Init(SDL_INIT_EVERYTHING) != 0)
             logErrorAndExit("SDL_Init", SDL_GetError());
 
@@ -81,6 +83,7 @@ struct Graphics {
         if (window == nullptr) logErrorAndExit("CreateWindow", SDL_GetError());
         SDL_SetWindowResizable(window, SDL_TRUE);
         SDL_MaximizeWindow(window);
+
         renderer = SDL_CreateRenderer(window, -1, SDL_RENDERER_ACCELERATED |
                                               SDL_RENDERER_PRESENTVSYNC);
 
@@ -89,35 +92,30 @@ struct Graphics {
         SDL_SetHint(SDL_HINT_RENDER_SCALE_QUALITY, "linear");
         SDL_RenderSetLogicalSize(renderer, SCREEN_WIDTH, SCREEN_HEIGHT);
 
-        // Add some grabbable objects
-        objects.push_back(GameObject(renderer, 400, 500, 200, 200, true));  // Main platform
-        objects.push_back(GameObject(renderer, 600, 400, 100, 20, true));  // Grabbable platform
-        objects.push_back(GameObject(renderer, 200, 300, 100, 20, true));  // Another grabbable platform
+        // Load platform texture
+        SDL_Texture* platformTexture = IMG_LoadTexture(renderer, "F:\\Game\\platform.png");
+        if (platformTexture) {
+            // Add single platform
+            SDL_Rect platformRect = {300, 300, 400, 150};
+            platforms.push_back(Platform(platformRect, platformTexture));
+        }
     }
 
-    SDL_Texture *loadTexture(const char *filename)
-    {
-        SDL_LogMessage(SDL_LOG_CATEGORY_APPLICATION, SDL_LOG_PRIORITY_INFO,
-                       "Loading %s", filename);
-        SDL_Texture *texture = IMG_LoadTexture(renderer, filename);
-        if (texture == NULL)
-            SDL_LogMessage(SDL_LOG_CATEGORY_APPLICATION,
-                  SDL_LOG_PRIORITY_ERROR, "Load texture %s", IMG_GetError());
-
-        return texture;
+    void renderPlatforms() {
+        for (const auto& platform : platforms) {
+            SDL_RenderCopy(renderer, platform.texture, NULL, &platform.rect);
+        }
     }
 
-    void renderTexture(SDL_Texture *texture, int x, int y)
-    {
-        SDL_Rect dest;
-
-        dest.x = x;
-        dest.y = y;
-        SDL_QueryTexture(texture, NULL, NULL, &dest.w, &dest.h);
-
-        SDL_RenderCopy(renderer, texture, NULL, &dest);
+    ~Graphics() {
+        for (auto& platform : platforms) {
+            if (platform.texture) {
+                SDL_DestroyTexture(platform.texture);
+            }
+        }
+        if (renderer) SDL_DestroyRenderer(renderer);
+        if (window) SDL_DestroyWindow(window);
     }
-    //not gonna use this just for sample code so i can figure how to attach the hands to the body
 };
 
 class ropehand {
@@ -269,7 +267,8 @@ private:
     }
 
     void enforceConstraint() {
-        for (int i = 0; i < jakobsenit; i++) {
+        const int iterations = isGrabbingObject ? 20 : jakobsenit;  // More iterations when grabbing
+        for (int i = 0; i < iterations; i++) {
             for (size_t j = 1; j < parti.size(); j++) {
                 Particle &p1 = parti[j-1];
                 Particle &p2 = parti[j];
@@ -279,22 +278,28 @@ private:
                 double xDifference = p2.xCurrent - p1.xCurrent;
                 double yDifference = p2.yCurrent - p1.yCurrent;
 
-                double xDirection = xDifference / sqrt(pow(xDifference, 2) + pow(yDifference, 2));
-                double yDirection = yDifference / sqrt(pow(xDifference, 2) + pow(yDifference, 2));
+                // Avoid division by zero
+                double totalDifference = sqrt(pow(xDifference, 2) + pow(yDifference, 2));
+                if (totalDifference < 0.0001) continue;
+
+                double xDirection = xDifference / totalDifference;
+                double yDirection = yDifference / totalDifference;
+
+                double correction = isGrabbingObject ? 1.0 : 0.5;  // Full correction when grabbing
 
                 if (p1.checkmovement && !p2.checkmovement) {
-                    p2.xCurrent -= xDirection * distanceError;
-                    p2.yCurrent -= yDirection * distanceError;
+                    p2.xCurrent -= xDirection * distanceError * correction;
+                    p2.yCurrent -= yDirection * distanceError * correction;
                 }
                 else if (p2.checkmovement && !p1.checkmovement) {
-                    p1.xCurrent += xDirection * distanceError;
-                    p1.yCurrent += yDirection * distanceError;
+                    p1.xCurrent += xDirection * distanceError * correction;
+                    p1.yCurrent += yDirection * distanceError * correction;
                 }
                 else if (!p1.checkmovement && !p2.checkmovement) {
-                    p2.xCurrent -= 0.5 * xDirection * distanceError;
-                    p2.yCurrent -= 0.5 * yDirection * distanceError;
-                    p1.xCurrent += 0.5 * xDirection * distanceError;
-                    p1.yCurrent += 0.5 * yDirection * distanceError;
+                    p2.xCurrent -= xDirection * distanceError * correction * 0.5;
+                    p2.yCurrent -= yDirection * distanceError * correction * 0.5;
+                    p1.xCurrent += xDirection * distanceError * correction * 0.5;
+                    p1.yCurrent += yDirection * distanceError * correction * 0.5;
                 }
             }
         }
@@ -317,16 +322,37 @@ public:
     const double HAND_FORCE = 500.0;
 
     Character(SDL_Renderer* renderer, double startX, double startY, double r, int handParticles)
-        : x(startX), y(-100), vx(0), vy(0), radius(r),
-          leftHand(startX - r, startX - r - 50, startY, startY, handParticles),
-          rightHand(startX + r, startX + r + 50, startY, startY, handParticles)
+        : x(startX), y(startY - 500), vx(0), vy(0), radius(r),  // Start 500 pixels above the platform
+          leftHand(startX - r, startX - r - 50, startY - 500, startY - 500, handParticles),
+          rightHand(startX + r, startX + r + 50, startY - 500, startY - 500, handParticles)
     {
-        texture = IMG_LoadTexture(renderer, "F:\\Game\\character.jpg");
-        if (!texture) cout << "Failed";
+        const char* texturePath = "F:\\Game\\character.png";
+        std::cout << "Attempting to load character texture from: " << texturePath << std::endl;
+
+        // Try to load the image first
+        SDL_Surface* surface = IMG_Load(texturePath);
+        if (!surface) {
+            std::cout << "Failed to load character image: " << IMG_GetError() << std::endl;
+        } else {
+            std::cout << "Successfully loaded surface. Size: " << surface->w << "x" << surface->h << std::endl;
+
+            // Try to create texture from surface
+            texture = SDL_CreateTextureFromSurface(renderer, surface);
+            if (!texture) {
+                std::cout << "Failed to create texture from surface: " << SDL_GetError() << std::endl;
+            } else {
+                std::cout << "Successfully created texture from surface" << std::endl;
+            }
+
+            SDL_FreeSurface(surface);
+        }
     }
 
     ~Character() {
-        if (texture) SDL_DestroyTexture(texture);
+        if (texture) {
+            SDL_DestroyTexture(texture);
+            texture = nullptr;
+        }
     }
 
     void update() {
@@ -358,7 +384,7 @@ public:
         rightHand.step();
     }
 
-    void grab(bool isLeft, const std::vector<GameObject>& objects) {
+    void grab(bool isLeft, const std::vector<Platform>& platforms) {
         double handX, handY;
         if (isLeft) {
             handX = leftHand.parti.back().xCurrent;
@@ -368,9 +394,9 @@ public:
             handY = rightHand.parti.back().yCurrent;
         }
 
-        for (const auto& obj : objects) {
-            if (obj.isGrabbable && handX >= obj.x && handX <= obj.x + obj.width &&
-                handY >= obj.y && handY <= obj.y + obj.height) {
+        for (const auto& platform : platforms) {
+            if (handX >= platform.rect.x && handX <= platform.rect.x + platform.rect.w &&
+                handY >= platform.rect.y && handY <= platform.rect.y + platform.rect.h) {
                 if (isLeft) {
                     leftHand.grab(handX, handY);
                 } else {
@@ -394,27 +420,27 @@ public:
         }
     }
 
-    bool checkCollision(const GameObject& obj, double& overlapX, double& overlapY) {
+    bool checkCollision(const SDL_Rect& rect, double& overlapX, double& overlapY) {
         double left = x - radius;
         double right = x + radius;
         double top = y - radius;
         double bottom = y + radius;
-        if (right > obj.x && left < obj.x + obj.width &&
-            bottom > obj.y && top < obj.y + obj.height) {
-            if (right - obj.x < obj.x + radius - left) overlapX = -(right - obj.x);
-            else overlapX = obj.x + radius - left;
-            if (bottom - obj.y < obj.y + radius - top) overlapY = -(bottom - obj.y);
-            else overlapY = obj.y + radius - top;
+        if (right > rect.x && left < rect.x + rect.w &&
+            bottom > rect.y && top < rect.y + rect.h) {
+            if (right - rect.x < rect.x + radius - left) overlapX = -(right - rect.x);
+            else overlapX = rect.x + radius - left;
+            if (bottom - rect.y < rect.y + radius - top) overlapY = -(bottom - rect.y);
+            else overlapY = rect.y + radius - top;
             return true;
         }
         return false;
     }
 
-    void handlecollision(const std::vector<GameObject>& objects) {
-        for (const auto& obj : objects) {
+    void handlecollision(const std::vector<Platform>& platforms) {
+        for (const auto& platform : platforms) {
             double overlapX = 0;
             double overlapY = 0;
-            if (checkCollision(obj, overlapX, overlapY)) {
+            if (checkCollision(platform.rect, overlapX, overlapY)) {
                 if (abs(overlapX) < abs(overlapY)) {
                     x += overlapX;
                     vx = 0;

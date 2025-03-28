@@ -23,43 +23,33 @@ int SDL_main(int argc, char* argv[]) {
             if (event.type == SDL_QUIT) running = false;
 
             if (event.type == SDL_KEYDOWN) {
-                if (event.key.keysym.sym == SDLK_ESCAPE) running = false;
-                if (event.key.keysym.sym == SDLK_LEFT) player.vx = -200;
-                if (event.key.keysym.sym == SDLK_RIGHT) player.vx = 200;
                 if (event.key.keysym.sym == SDLK_a)
-                    player.grab(true, graphics.objects);  // Use graphics.objects
-                if (event.key.keysym.sym == SDLK_d)
-                    player.grab(false, graphics.objects); // Use graphics.objects
+                    player.grab(true, graphics.platforms);
+                if (event.key.keysym.sym == SDLK_k)
+                    player.grab(false, graphics.platforms);
             }
 
             if (event.type == SDL_KEYUP) {
-                if (event.key.keysym.sym == SDLK_LEFT) if (player.vx < 0) player.vx = 0;
-                if (event.key.keysym.sym == SDLK_RIGHT) if (player.vx > 0) player.vx = 0;
                 if (event.key.keysym.sym == SDLK_a)
                     player.release(true);
-                if (event.key.keysym.sym == SDLK_d)
+                if (event.key.keysym.sym == SDLK_k)
                     player.release(false);
             }
         }
 
-        // Update all objects
-        for (auto& obj : graphics.objects) {
-            obj.update(0.016);  // 60 FPS = 0.016 seconds per frame
-        }
-
-        // Update player
         player.update();
-        player.handlecollision(graphics.objects);
 
+        // Clear the renderer
         SDL_SetRenderDrawColor(graphics.renderer, 0, 0, 0, 255);
         SDL_RenderClear(graphics.renderer);
 
-        // Render objects first
-        for (const auto& obj : graphics.objects) {
-            obj.render(graphics.renderer);
-        }
+        // Render platforms first
+        graphics.renderPlatforms();
 
+        // Then render the player (which includes the character and hands)
         player.render(graphics.renderer);
+
+        // Present the frame
         SDL_RenderPresent(graphics.renderer);
         SDL_Delay(16);
     }
