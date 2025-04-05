@@ -19,6 +19,8 @@ struct Particle {
     double xPrevious;
     double yPrevious;
     bool checkmovement;
+    double xOld;
+    double yOld;
 };
 
 struct GameObject {
@@ -30,22 +32,54 @@ struct GameObject {
         : x(startX), y(startY), width(w), height(h), isGrabbable(grabbable)
     {
         const char* texturePath = "F:\\Game\\platform.png";
+        std::cout << "Attempting to load platform texture from: " << texturePath << std::endl;
+
+        // Try to load the image first
         SDL_Surface* surface = IMG_Load(texturePath);
-        texture = SDL_CreateTextureFromSurface(renderer, surface);
-        SDL_FreeSurface(surface);
+        if (!surface) {
+            std::cout << "Failed to load platform image: " << IMG_GetError() << std::endl;
+        } else {
+            std::cout << "Successfully loaded surface. Size: " << surface->w << "x" << surface->h << std::endl;
+
+            // Try to create texture from surface
+            texture = SDL_CreateTextureFromSurface(renderer, surface);
+            if (!texture) {
+                std::cout << "Failed to create texture from surface: " << SDL_GetError() << std::endl;
+            } else {
+                std::cout << "Successfully created texture from surface" << std::endl;
+            }
+
+            SDL_FreeSurface(surface);
+        }
     }
 
     void update(double dt) {
+        // No update needed for static platforms
     }
 
     void render(SDL_Renderer* renderer) const {
+        if (!texture) {
+            std::cout << "Warning: Trying to render with null texture" << std::endl;
+            // Draw a colored rectangle as fallback
+            SDL_SetRenderDrawColor(renderer, 255, 255, 255, 255);  // Red color
+            SDL_Rect destRect = {
+                static_cast<int>(x),
+                static_cast<int>(y),
+                static_cast<int>(width),
+                static_cast<int>(height)
+            };
+            SDL_RenderFillRect(renderer, &destRect);
+            return;
+        }
         SDL_Rect destRect = {
             static_cast<int>(x),
             static_cast<int>(y),
             static_cast<int>(width),
             static_cast<int>(height)
         };
-        SDL_RenderCopy(renderer, texture, NULL, &destRect);
+        if (SDL_RenderCopy(renderer, texture, NULL, &destRect) != 0) {
+            std::cout << "Failed to render platform: " << SDL_GetError() << std::endl;
+        }
     }
 
     ~GameObject() {
@@ -59,8 +93,14 @@ struct GameObject {
 struct Platform {
     SDL_Rect rect;
     SDL_Texture* texture;
+    double visualHeight;  // Actual visual height of the platform texture
 
-    Platform(SDL_Rect r, SDL_Texture* t) : rect(r), texture(t) {}
+    Platform(SDL_Rect r, SDL_Texture* t) : rect(r), texture(t) {
+        // Get the actual texture dimensions
+        int w, h;
+        SDL_QueryTexture(t, NULL, NULL, &w, &h);
+        visualHeight = h;
+    }
 };
 
 struct Graphics {
@@ -96,14 +136,27 @@ struct Graphics {
         SDL_Texture* platformTexture = IMG_LoadTexture(renderer, "F:\\Game\\platform.png");
         if (platformTexture) {
             // Add single platform
-            SDL_Rect platformRect = {300, 300, 400, 150};
+            SDL_Rect platformRect = {300, 300, 200, 20};
             platforms.push_back(Platform(platformRect, platformTexture));
+            std::cout << "Created platform at position: (300, 300) with size: 200x20" << std::endl;
         }
     }
 
     void renderPlatforms() {
         for (const auto& platform : platforms) {
-            SDL_RenderCopy(renderer, platform.texture, NULL, &platform.rect);
+            // Calculate the visual height based on the texture's aspect ratio
+            int w, h;
+            SDL_QueryTexture(platform.texture, NULL, NULL, &w, &h);
+            double aspectRatio = static_cast<double>(h) / w;
+            int visualHeight = static_cast<int>(platform.rect.w * aspectRatio);
+
+            SDL_Rect destRect = {
+                platform.rect.x,
+                platform.rect.y,
+                platform.rect.w,
+                visualHeight
+            };
+            SDL_RenderCopy(renderer, platform.texture, NULL, &destRect);
         }
     }
 
@@ -148,8 +201,8 @@ public:
     }
 
     void step() {
-        verletintergraion();
-        enforceConstraint();
+    verletintergraion();
+    enforceConstraint();
     }
 
     void attachtothebody(double bodyx, double bodyy, double bodywidth, bool islefthand) {
@@ -159,9 +212,9 @@ public:
         } else {
             parti[0].xCurrent = bodyx + (bodywidth/2);
         }
-        parti[0].yCurrent = bodyy;
-        parti[0].xPrevious = parti[0].xCurrent;
-        parti[0].yPrevious = parti[0].yCurrent;
+    parti[0].yCurrent = bodyy;
+    parti[0].xPrevious = parti[0].xCurrent;
+    parti[0].yPrevious = parti[0].yCurrent;
 
         // If not grabbing, keep the hand within max length
         if (!isGrabbingObject) {
@@ -185,46 +238,78 @@ public:
     }
 
     void release() {
-        parti.back().checkmovement = false;
+         parti.back().checkmovement = false;
         isGrabbingObject = false;
     }
 
-    void handlecollision(const std::vector<GameObject>& object) {
-        for (size_t i = 0; i < parti.size(); i++) {
-            Particle &p1 = parti[i];
-            for (const auto &obj : object) {
-                double overlapX = 0;
-                double overlapY = 0;
-
-                if (p1.xCurrent > obj.x &&
-                    p1.xCurrent < obj.x + obj.width &&
-                    p1.yCurrent > obj.y &&
-                    p1.yCurrent < obj.y + obj.height) {
-
-                    if (p1.xCurrent - obj.x < obj.x + obj.width - p1.xCurrent)
-                        overlapX = -(p1.xCurrent - obj.x);  // Need negative for correct push direction
-                    else
-                        overlapX = obj.x + obj.width - p1.xCurrent;
-
-                    // Calculate Y overlap
-                    if (p1.yCurrent - obj.y < obj.y + obj.height - p1.yCurrent)
-                        overlapY = -(p1.yCurrent - obj.y);  // Need negative for correct push direction
-                    else
-                        overlapY = obj.y + obj.height - p1.yCurrent;
-
-                    // Apply the smaller overlap
-                    if (abs(overlapX) < abs(overlapY))
-                        p1.xCurrent += overlapX;
-                    else
-                        p1.yCurrent += overlapY;
+    void handlecollision(const std::vector<Platform>& platforms) {
+        const double BOUNCE = 0.1; // Reduced bounce factor
+        
+        // Check each particle in the rope
+        for (auto& particle : parti) {
+            for (const auto& platform : platforms) {
+                // Get current velocity
+                double velX = particle.xCurrent - particle.xPrevious;
+                double velY = particle.yCurrent - particle.yPrevious;
+                
+                // Check current position and predicted next position
+                double nextX = particle.xCurrent + velX;
+                double nextY = particle.yCurrent + velY;
+                
+                // Line segment intersection test between current and next position
+                bool collision = false;
+                double intersectX = 0, intersectY = 0;
+                
+                // Check top edge of platform
+                if (velY > 0 && // Moving downward
+                    particle.yCurrent <= platform.rect.y && nextY >= platform.rect.y &&
+                    particle.xCurrent + velX >= platform.rect.x && 
+                    particle.xCurrent + velX <= platform.rect.x + platform.rect.w) {
+                    // Collision with top of platform
+                    particle.yCurrent = platform.rect.y;
+                    particle.yPrevious = particle.yCurrent - velY * BOUNCE;
+                    collision = true;
+                }
+                
+                // Check bottom edge of platform
+                else if (velY < 0 && // Moving upward
+                    particle.yCurrent >= platform.rect.y + platform.rect.h && 
+                    nextY <= platform.rect.y + platform.rect.h &&
+                    particle.xCurrent + velX >= platform.rect.x && 
+                    particle.xCurrent + velX <= platform.rect.x + platform.rect.w) {
+                    // Collision with bottom of platform
+                    particle.yCurrent = platform.rect.y + platform.rect.h;
+                    particle.yPrevious = particle.yCurrent - velY * BOUNCE;
+                    collision = true;
+                }
+                
+                // Check left edge of platform
+                if (!collision && velX > 0 && // Moving right
+                    particle.xCurrent <= platform.rect.x && nextX >= platform.rect.x &&
+                    particle.yCurrent + velY >= platform.rect.y && 
+                    particle.yCurrent + velY <= platform.rect.y + platform.rect.h) {
+                    // Collision with left of platform
+                    particle.xCurrent = platform.rect.x;
+                    particle.xPrevious = particle.xCurrent - velX * BOUNCE;
+                }
+                
+                // Check right edge of platform
+                else if (!collision && velX < 0 && // Moving left
+                    particle.xCurrent >= platform.rect.x + platform.rect.w && 
+                    nextX <= platform.rect.x + platform.rect.w &&
+                    particle.yCurrent + velY >= platform.rect.y && 
+                    particle.yCurrent + velY <= platform.rect.y + platform.rect.h) {
+                    // Collision with right of platform
+                    particle.xCurrent = platform.rect.x + platform.rect.w;
+                    particle.xPrevious = particle.xCurrent - velX * BOUNCE;
                 }
             }
         }
     }
 
     void render(SDL_Renderer* renderer) {
-        SDL_SetRenderDrawColor(renderer, 255, 255, 255, 255);
-        for (size_t i = 0; i < parti.size() - 1; i++) {
+    SDL_SetRenderDrawColor(renderer, 255, 255, 255, 255);
+    for (size_t i = 0; i < parti.size() - 1; i++) {
             SDL_RenderDrawLine(renderer,
                 static_cast<int>(parti[i].xCurrent),
                 static_cast<int>(parti[i].yCurrent),
@@ -238,8 +323,8 @@ public:
             // Apply force to the last particle (hand)
             parti.back().xCurrent += forceX;
             parti.back().yCurrent += forceY;
-        }
     }
+}
 
 private:
     const double dt = 0.016;
@@ -247,24 +332,24 @@ private:
 
     void verletintergraion() {
         double damping = 0.98;  // Increased damping for more stable movement
-        for (Particle &pn : parti) {
+    for (Particle &pn : parti) {
             if (pn.checkmovement) continue;
 
-            double prevX = pn.xCurrent;
-            double prevY = pn.yCurrent;
+        double prevX = pn.xCurrent;
+        double prevY = pn.yCurrent;
 
-            double velocityX = (pn.xCurrent - pn.xPrevious) * damping;
-            double velocityY = (pn.yCurrent - pn.yPrevious) * damping;
+        double velocityX = (pn.xCurrent - pn.xPrevious) * damping;
+        double velocityY = (pn.yCurrent - pn.yPrevious) * damping;
 
             velocityY += 9.81 * dt;
 
-            pn.xCurrent += velocityX;
-            pn.yCurrent += velocityY;
+        pn.xCurrent += velocityX;
+        pn.yCurrent += velocityY;
 
-            pn.xPrevious = prevX;
-            pn.yPrevious = prevY;
-        }
+        pn.xPrevious = prevX;
+        pn.yPrevious = prevY;
     }
+}
 
     void enforceConstraint() {
         const int iterations = isGrabbingObject ? 20 : jakobsenit;  // More iterations when grabbing
@@ -316,35 +401,52 @@ public:
     ropehand rightHand;
     SDL_Texture *texture;
 
-    const double GRAVITY = 981.0;
-    const double DRAG = 0.98;
-    const double MAX_SPEED = 400.0;
-    const double HAND_FORCE = 500.0;
+    const double GRAVITY = 500.0;  // Reduced from 981.0
+    const double DRAG = 0.95;      // Increased drag from 0.98 to slow horizontal movement
+    const double MAX_SPEED = 300.0; // Reduced from 400.0
+    const double HAND_FORCE = 300.0; // Reduced from 500.0
+    const double SWING_FORCE = 150.0;  // Reduced swing force for more controlled movement
 
     Character(SDL_Renderer* renderer, double startX, double startY, double r, int handParticles)
         : x(startX), y(startY - 500), vx(0), vy(0), radius(r),  // Start 500 pixels above the platform
-          leftHand(startX - r, startX - r - 50, startY - 500, startY - 500, handParticles),
-          rightHand(startX + r, startX + r + 50, startY - 500, startY - 500, handParticles)
+          // Initialize hands at the edges of the character with slightly longer ropes (25 pixels instead of 20)
+          leftHand(startX - r, startX - r - 25, startY - 500, startY - 500 - 25, handParticles),
+          rightHand(startX + r, startX + r + 25, startY - 500, startY - 500 - 25, handParticles)
     {
         const char* texturePath = "F:\\Game\\character.png";
         std::cout << "Attempting to load character texture from: " << texturePath << std::endl;
 
         // Try to load the image first
-        SDL_Surface* surface = IMG_Load(texturePath);
-        if (!surface) {
+        SDL_Surface* originalSurface = IMG_Load(texturePath);
+        if (!originalSurface) {
             std::cout << "Failed to load character image: " << IMG_GetError() << std::endl;
+            return;
+        }
+
+        // Create a new surface at the desired size (2*radius x 2*radius)
+        SDL_Surface* scaledSurface = SDL_CreateRGBSurface(0, radius * 2, radius * 2, 32,
+            0x00FF0000, 0x0000FF00, 0x000000FF, 0xFF000000);
+
+        if (!scaledSurface) {
+            std::cout << "Failed to create scaled surface: " << SDL_GetError() << std::endl;
+            SDL_FreeSurface(originalSurface);
+            return;
+        }
+
+        // Scale the image to match the collision size
+        SDL_BlitScaled(originalSurface, NULL, scaledSurface, NULL);
+
+        // Create texture from the scaled surface
+        texture = SDL_CreateTextureFromSurface(renderer, scaledSurface);
+
+        // Clean up surfaces
+        SDL_FreeSurface(originalSurface);
+        SDL_FreeSurface(scaledSurface);
+
+        if (!texture) {
+            std::cout << "Failed to create texture: " << SDL_GetError() << std::endl;
         } else {
-            std::cout << "Successfully loaded surface. Size: " << surface->w << "x" << surface->h << std::endl;
-
-            // Try to create texture from surface
-            texture = SDL_CreateTextureFromSurface(renderer, surface);
-            if (!texture) {
-                std::cout << "Failed to create texture from surface: " << SDL_GetError() << std::endl;
-            } else {
-                std::cout << "Successfully created texture from surface" << std::endl;
-            }
-
-            SDL_FreeSurface(surface);
+            std::cout << "Successfully created character texture at size: " << (radius * 2) << "x" << (radius * 2) << std::endl;
         }
     }
 
@@ -355,18 +457,76 @@ public:
         }
     }
 
+    void applySwingForces(const Uint8* keystate) {
+        // Only apply swing if exactly one hand is grabbing
+        if (!(leftHand.isGrabbingObject ^ rightHand.isGrabbingObject)) return;
+
+        // Get the pivot point (the grabbing hand's position)
+        double pivotX, pivotY;
+        bool isRightHandGrabbing = rightHand.isGrabbingObject;
+
+        if (isRightHandGrabbing) {
+            pivotX = rightHand.parti.back().xCurrent;
+            pivotY = rightHand.parti.back().yCurrent;
+        } else {
+            pivotX = leftHand.parti.back().xCurrent;
+            pivotY = leftHand.parti.back().yCurrent;
+        }
+
+        // Check direction controls
+        bool swingLeft = keystate[SDL_SCANCODE_LEFT];
+        bool swingRight = keystate[SDL_SCANCODE_RIGHT];
+        bool reachUp = keystate[SDL_SCANCODE_UP];
+        bool reachDown = keystate[SDL_SCANCODE_DOWN];
+
+        // Calculate current angle from pivot to body
+        double dx = x - pivotX;
+        double dy = y - pivotY;
+        static double currentAngle = atan2(dy, dx);
+        
+        const double ROTATION_SPEED = 4.0; // Speed of rotation
+        const double dt = 0.016;
+
+        // Update angle based on input
+        if (reachUp) {
+            currentAngle += ROTATION_SPEED * dt * (isRightHandGrabbing ? -1 : 1);
+        } else if (reachDown) {
+            currentAngle -= ROTATION_SPEED * dt * (isRightHandGrabbing ? -1 : 1);
+        }
+
+        // Keep angle in range [0, 2π]
+        while (currentAngle > 2 * M_PI) currentAngle -= 2 * M_PI;
+        while (currentAngle < 0) currentAngle += 2 * M_PI;
+
+        // Calculate rope length
+        double ropeLength = radius * 2.0;
+
+        // Move body based on angle
+        x = pivotX + cos(currentAngle) * ropeLength;
+        y = pivotY + sin(currentAngle) * ropeLength;
+
+        // Apply swing force to velocity only when actively swinging
+        if (swingLeft || swingRight) {
+            double swingForce = 150.0;
+            if (swingLeft) vx -= swingForce * dt;
+            if (swingRight) vx += swingForce * dt;
+        }
+    }
+
     void update() {
         const double dt = 0.016;
 
-        // Apply gravity only when not grabbing
-        if (!leftHand.isGrabbingObject && !rightHand.isGrabbingObject) {
-            vy += GRAVITY * dt;
-            vy = std::min(vy, MAX_SPEED);
-        }
-        else {
-            // When grabbing, stop falling
-            vy = 0;
-        }
+        // Get keyboard state for swing controls
+        const Uint8* keystate = SDL_GetKeyboardState(NULL);
+
+        // Apply swing forces before gravity
+        applySwingForces(keystate);
+
+        // Always apply gravity
+        vy += GRAVITY * dt;
+
+        // Limit fall speed
+        vy = std::min(vy, MAX_SPEED);
 
         // Apply drag to horizontal movement
         vx *= DRAG;
@@ -375,9 +535,9 @@ public:
         x += vx * dt;
         y += vy * dt;
 
-        // Keep hands attached
-        leftHand.attachtothebody(x, y, radius, true);
-        rightHand.attachtothebody(x, y, radius, false);
+        // Keep hands attached at the edges of the character
+        leftHand.attachtothebody(x - radius, y, radius * 0.2, true);
+        rightHand.attachtothebody(x + radius, y, radius * 0.2, false);
 
         // Update hands physics
         leftHand.step();
@@ -438,19 +598,54 @@ public:
 
     void handlecollision(const std::vector<Platform>& platforms) {
         for (const auto& platform : platforms) {
-            double overlapX = 0;
-            double overlapY = 0;
-            if (checkCollision(platform.rect, overlapX, overlapY)) {
+            SDL_Rect collisionRect = platform.rect;
+
+            // Check collision between character and platform
+            double characterLeft = x - radius;
+            double characterRight = x + radius;
+            double characterTop = y - radius;
+            double characterBottom = y + radius;
+
+            double platformLeft = collisionRect.x;
+            double platformRight = collisionRect.x + collisionRect.w;
+            double platformTop = collisionRect.y;
+            double platformBottom = collisionRect.y + collisionRect.h;
+
+            // Check if there is any overlap
+            if (characterRight > platformLeft && characterLeft < platformRight &&
+                characterBottom > platformTop && characterTop < platformBottom) {
+
+                // Calculate overlap amounts
+                double overlapLeft = characterRight - platformLeft;
+                double overlapRight = platformRight - characterLeft;
+                double overlapTop = characterBottom - platformTop;
+                double overlapBottom = platformBottom - characterTop;
+
+                // Find smallest overlap
+                double overlapX = (overlapLeft < overlapRight) ? -overlapLeft : overlapRight;
+                double overlapY = (overlapTop < overlapBottom) ? -overlapTop : overlapBottom;
+
+                // Resolve collision based on smallest overlap
                 if (abs(overlapX) < abs(overlapY)) {
+                    // Horizontal collision
                     x += overlapX;
                     vx = 0;
-                }
-                else {
+                } else {
+                    // Vertical collision
                     y += overlapY;
-                    vy = 0;
+                    if (overlapY < 0) { // If hitting from above
+                        vy = 0;  // Just stop, no bounce
+                        y = platformTop - radius;  // Place exactly on top
+                    } else {  // If hitting from below
+                        vy = 0;  // Stop upward movement
+                    }
                 }
             }
         }
+
+        // Also handle rope collisions
+        leftHand.handlecollision(platforms);
+        rightHand.handlecollision(platforms);
     }
 
     void render(SDL_Renderer* renderer) {
@@ -466,7 +661,7 @@ public:
         // Then render the ropes on top
         leftHand.render(renderer);
         rightHand.render(renderer);
-    }
+}
 };
 
 #endif

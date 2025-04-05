@@ -1,5 +1,5 @@
 # depslib dependency file v1.0
-1743189496 source:f:\game\main.cpp
+1743533826 source:f:\game\main.cpp
 	<SDL.h>
 	<SDL_image.h>
 	<iostream>
@@ -10,7 +10,7 @@
 
 1743186689 f:\game\defs.h
 
-1743190257 f:\game\graphics.h
+1743573712 f:\game\graphics.h
 	<SDL.h>
 	<SDL_image.h>
 	"defs.h"
