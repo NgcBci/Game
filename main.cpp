@@ -48,7 +48,7 @@ int SDL_main(int argc, char* argv[]) {
 
         // Update character (includes swing forces based on left/right arrow keys)
         player.update();
-        
+
         // Handle collisions with platforms
         player.handlecollision(graphics.platforms);
 
@@ -58,7 +58,7 @@ int SDL_main(int argc, char* argv[]) {
 
         // Render platforms first
         graphics.renderPlatforms();
-        
+
         // Render character on top
         player.render(graphics.renderer);
 
