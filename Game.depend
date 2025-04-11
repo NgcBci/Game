@@ -1,5 +1,5 @@
 # depslib dependency file v1.0
-1744120438 source:f:\game\main.cpp
+1744386129 source:f:\game\main.cpp
 	<SDL.h>
 	<SDL_image.h>
 	<iostream>
@@ -7,13 +7,21 @@
 	<cmath>
 	"defs.h"
 	"graphics.h"
+	"menupanel.h"
 
-1743186689 f:\game\defs.h
+1744387817 f:\game\defs.h
 
-1744157509 f:\game\graphics.h
+1744388408 f:\game\graphics.h
 	<SDL.h>
 	<SDL_image.h>
 	"defs.h"
 	<vector>
 	<cmath>
+	<cstdlib>
+
+1744374465 f:\game\menupanel.h
+	<SDL.h>
+	<string>
+	<vector>
+	"defs.h"
 

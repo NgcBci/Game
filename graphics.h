@@ -5,6 +5,7 @@
 #include "defs.h"
 #include <vector>
 #include <cmath>
+#include <cstdlib> // For rand()
 
 using std::vector;
 
@@ -28,7 +29,7 @@ struct GameObject {
         : x(startX), y(startY), width(w), height(h), isGrabbable(grabbable), texture(nullptr)
     {
         const char* texturePath = "F:\\Game\\platform.png";
-        
+
         SDL_Surface* surface = IMG_Load(texturePath);
         if (surface) {
             texture = SDL_CreateTextureFromSurface(renderer, surface);
@@ -119,6 +120,31 @@ struct Graphics {
             SDL_Rect platformRect = {300, 300, 200, 20};
             platforms.push_back(Platform(platformRect, platformTexture));
         }
+
+        // Load square thing texture
+        SDL_Texture* squareTexture = IMG_LoadTexture(renderer, "F:\\Game\\squarething.png");
+        if (squareTexture) {
+            // Add square thing at the very top of the screen
+            SDL_Rect squareRect = {
+                SCREEN_WIDTH/2 - 200,  // Center horizontally (screen width/2 - half of square width)
+                0,                     // Position at the very top of the screen
+                409,                   // Width
+                307                    // Height
+            };
+            platforms.push_back(Platform(squareRect, squareTexture));
+        }
+
+        // Add finish line on the right side
+        SDL_Texture* finishTexture = IMG_LoadTexture(renderer, "F:\\Game\\finishline.png");
+        if (finishTexture) {
+            SDL_Rect finishRect = {
+                SCREEN_WIDTH - 300,  // Moved more to the left
+                400,                 // Same y position
+                200,                 // Width
+                100                  // Height
+            };
+            platforms.push_back(Platform(finishRect, finishTexture));
+        }
     }
 
     void renderPlatforms() {
@@ -157,10 +183,41 @@ public:
     vector<Particle> parti;
     double maxLength;
     double currentLength;
+    SDL_Texture* handTexture;
+    SDL_Texture* grabTexture;  // New texture for grabbing state
+    bool isLeftHand;
 
-    ropehand(double x1, double x2, double y1, double y2, int numberofparticles) {
+    ropehand(SDL_Renderer* renderer, double x1, double x2, double y1, double y2, int numberofparticles, bool isLeft)
+        : isLeftHand(isLeft) {
         maxLength = sqrt(pow(x2 - x1, 2) + pow(y2 - y1, 2));  // Calculate maximum length
         currentLength = maxLength;
+
+        // Load release hand texture based on hand type
+        const char* releasePath = isLeft ? "F:\\Game\\lefthandrelease.png" : "F:\\Game\\righthandrelease.png";
+        SDL_Surface* surface = IMG_Load(releasePath);
+        if (surface) {
+            handTexture = SDL_CreateTextureFromSurface(renderer, surface);
+            SDL_FreeSurface(surface);
+        } else {
+            printf("Failed to load release hand texture: %s\n", IMG_GetError());
+            handTexture = nullptr;
+        }
+
+        // Load grab hand texture based on hand type
+        const char* grabPath = isLeft ? "F:\\Game\\grableft.png" : "F:\\Game\\grabright.png";
+        surface = IMG_Load(grabPath);
+        if (surface) {
+            grabTexture = SDL_CreateTextureFromSurface(renderer, surface);
+            SDL_FreeSurface(surface);
+        } else {
+            printf("Failed to load grab hand texture: %s\n", IMG_GetError());
+            grabTexture = nullptr;
+        }
+
+        // If grab texture failed to load, use release texture as fallback
+        if (!grabTexture && handTexture) {
+            grabTexture = handTexture;
+        }
 
         for (int i = 0; i < numberofparticles; i++) {
             double weightforlerp = (double)i/(numberofparticles - 1);
@@ -177,6 +234,66 @@ public:
         }
         int segments = numberofparticles - 1;
         desireddistance = maxLength/segments;
+    }
+
+    ~ropehand() {
+        if (handTexture) {
+            SDL_DestroyTexture(handTexture);
+        }
+        if (grabTexture) {
+            SDL_DestroyTexture(grabTexture);
+        }
+    }
+
+    void render(SDL_Renderer* renderer) {
+        SDL_SetRenderDrawColor(renderer, 255, 0, 0, 255);
+        for (size_t i = 0; i < parti.size() - 1; i++) {
+            // Draw multiple lines to create a thicker rope
+            for (int offset = -2; offset <= 2; offset++) {
+                SDL_RenderDrawLine(renderer,
+                    static_cast<int>(parti[i].xCurrent),
+                    static_cast<int>(parti[i].yCurrent + offset),
+                    static_cast<int>(parti[i + 1].xCurrent),
+                    static_cast<int>(parti[i + 1].yCurrent + offset));
+            }
+            for (int offset = -2; offset <= 2; offset++) {
+                SDL_RenderDrawLine(renderer,
+                    static_cast<int>(parti[i].xCurrent + offset),
+                    static_cast<int>(parti[i].yCurrent),
+                    static_cast<int>(parti[i + 1].xCurrent + offset),
+                    static_cast<int>(parti[i + 1].yCurrent));
+            }
+        }
+
+        // Draw hand at the end of the rope
+        SDL_Texture* currentTexture = isGrabbingObject ? grabTexture : handTexture;
+        if (currentTexture) {
+            int handWidth = 40;
+            int handHeight = 40;
+
+            // Calculate the angle of the rope
+            double dx = parti.back().xCurrent - parti[parti.size()-2].xCurrent;
+            double dy = parti.back().yCurrent - parti[parti.size()-2].yCurrent;
+            double angle = atan2(dy, dx) * 180.0 / M_PI;
+
+            // Calculate hand position based on rope angle
+            double handX = parti.back().xCurrent;
+            double handY = parti.back().yCurrent + 10; // Move hand down to connect with rope
+
+            // Create destination rectangle
+            SDL_Rect handRect = {
+                static_cast<int>(handX - handWidth/2),
+                static_cast<int>(handY - handHeight/2),
+                handWidth,
+                handHeight
+            };
+
+            // Calculate center point for rotation
+            SDL_Point center = {handWidth/2, handHeight/2};
+
+            // Render with rotation
+            SDL_RenderCopyEx(renderer, currentTexture, NULL, &handRect, angle, &center, SDL_FLIP_NONE);
+        }
     }
 
     void step() {
@@ -210,6 +327,7 @@ public:
     }
 
     void grab(double grabx, double graby) {
+        // Update the last particle's position to the grab point
         parti.back().xCurrent = grabx;
         parti.back().yCurrent = graby;
         parti.back().checkmovement = true;
@@ -286,17 +404,6 @@ public:
         }
     }
 
-    void render(SDL_Renderer* renderer) {
-    SDL_SetRenderDrawColor(renderer, 255, 255, 255, 255);
-    for (size_t i = 0; i < parti.size() - 1; i++) {
-            SDL_RenderDrawLine(renderer,
-                static_cast<int>(parti[i].xCurrent),
-                static_cast<int>(parti[i].yCurrent),
-                static_cast<int>(parti[i + 1].xCurrent),
-                static_cast<int>(parti[i + 1].yCurrent));
-        }
-    }
-
     void pull(double forceX, double forceY) {
         if (isGrabbingObject) {
             // Apply force to the last particle (hand)
@@ -311,25 +418,25 @@ private:
 
     void verletintergraion() {
         double damping = 0.99;  // Increased damping for better momentum preservation
-        for (Particle &pn : parti) {
+    for (Particle &pn : parti) {
             if (pn.checkmovement) continue;
 
-            double prevX = pn.xCurrent;
-            double prevY = pn.yCurrent;
+        double prevX = pn.xCurrent;
+        double prevY = pn.yCurrent;
 
-            double velocityX = (pn.xCurrent - pn.xPrevious) * damping;
-            double velocityY = (pn.yCurrent - pn.yPrevious) * damping;
+        double velocityX = (pn.xCurrent - pn.xPrevious) * damping;
+        double velocityY = (pn.yCurrent - pn.yPrevious) * damping;
 
             // Apply less gravity to rope particles for smoother rope movement
             velocityY += 5.0 * dt; // Reduced from 9.81 for rope particles
 
-            pn.xCurrent += velocityX;
-            pn.yCurrent += velocityY;
+        pn.xCurrent += velocityX;
+        pn.yCurrent += velocityY;
 
-            pn.xPrevious = prevX;
-            pn.yPrevious = prevY;
-        }
+        pn.xPrevious = prevX;
+        pn.yPrevious = prevY;
     }
+}
 
     void enforceConstraint() {
         const int iterations = isGrabbingObject ? 20 : jakobsenit;  // More iterations when grabbing
@@ -380,6 +487,7 @@ public:
     ropehand leftHand;
     ropehand rightHand;
     SDL_Texture *texture;
+    bool hasReachedFinish;  // New flag to track completion
 
     // Physics constants
     const double dt = 0.016;             // Time step
@@ -407,8 +515,9 @@ public:
     Character(SDL_Renderer* renderer, double startX, double startY, double r, int handParticles)
         : x(startX), y(startY - 500), vx(0), vy(0), radius(r),  // Start 500 pixels above the platform
           // Initialize hands at the edges of the character with medium length ropes (35 pixels)
-          leftHand(startX - r, startX - r - 35, startY - 500, startY - 500 - 35, handParticles),
-          rightHand(startX + r, startX + r + 35, startY - 500, startY - 500 - 35, handParticles)
+          leftHand(renderer, startX - r, startX - r - 35, startY - 500, startY - 500 - 35, handParticles, true),
+          rightHand(renderer, startX + r, startX + r + 35, startY - 500, startY - 500 - 35, handParticles, false),
+          hasReachedFinish(false)  // Initialize completion flag
     {
         const char* texturePath = "F:\\Game\\character.png";
 
@@ -450,7 +559,40 @@ public:
     }
 
     void applySwingForces(const Uint8* keystate) {
-        // Only apply forces if exactly one hand is grabbing
+        // Handle case when both hands are grabbing
+        if (leftHand.isGrabbingObject && rightHand.isGrabbingObject) {
+            // Get both grab points
+            double leftX = leftHand.parti.back().xCurrent;
+            double leftY = leftHand.parti.back().yCurrent;
+            double rightX = rightHand.parti.back().xCurrent;
+            double rightY = rightHand.parti.back().yCurrent;
+
+            // Calculate midpoint between hands
+            double midX = (leftX + rightX) / 2.0;
+            double midY = (leftY + rightY) / 2.0;
+
+            // Calculate distance between hands
+            double handDistance = sqrt(pow(rightX - leftX, 2) + pow(rightY - leftY, 2));
+
+            // Maximum allowed distance between character and midpoint
+            double maxDistance = handDistance * 0.5; // Character can't be more than half the hand distance away
+
+            // Calculate current distance from midpoint
+            double currentDistance = sqrt(pow(x - midX, 2) + pow(y - midY, 2));
+
+            // If character is too far from midpoint, pull it back
+            if (currentDistance > maxDistance) {
+                double ratio = maxDistance / currentDistance;
+                x = midX + (x - midX) * ratio;
+                y = midY + (y - midY) * ratio;
+            }
+
+            // Apply gravity
+            vy += GRAVITY * 0.7 * dt;
+            return;
+        }
+
+        // Original single-hand grabbing code
         if (!(leftHand.isGrabbingObject ^ rightHand.isGrabbingObject)) {
             // In free fall, just apply gravity
             vy += GRAVITY * dt;
@@ -483,33 +625,33 @@ public:
         double& handY = freeHand.parti.back().yCurrent;
         double& handVX = freeHand.parti.back().xPrevious;  // Using previous position to store velocity
         double& handVY = freeHand.parti.back().yPrevious;
-        
+
         // Calculate current hand velocity
         double handVelocityX = handX - handVX;
         double handVelocityY = handY - handVY;
-        
+
         // Apply gentler upward force when UP key is pressed - special case
         if (inputY < 0) {
             // Apply upward force to the free hand - more gradual
             handVelocityY += inputY * HAND_FORCE * 0.8 * dt; // Reduced to 80% for more visibility
-            
+
             // Add small lift to body for air climbing (reduced)
             vy -= FLAP_LIFT * 0.7 * dt;
         }
-        
+
         // Apply horizontal force to free hand for directional swing control
         if (inputX != 0) {
             handVelocityX += inputX * HAND_FORCE * 0.6 * dt;
         }
-        
+
         // Apply minimal damping to preserve momentum
         handVelocityX *= 0.98; // Slightly more damping for smoother motion
         handVelocityY *= 0.98;
-        
+
         // Update hand position with gentler movement
         handX = handVX + handVelocityX;
         handY = handVY + handVelocityY;
-        
+
         // Store velocity for next frame
         handVX = handX - handVelocityX;
         handVY = handY - handVelocityY;
@@ -518,7 +660,7 @@ public:
         double dx = x - pivotX;
         double dy = y - pivotY;
         double distance = sqrt(dx*dx + dy*dy);
-        
+
         if (distance < 0.0001) return; // Avoid division by zero
 
         // Calculate tangent direction (perpendicular to radius)
@@ -532,24 +674,24 @@ public:
         double gravityAngle = atan2(dy, dx);
         double gravityTangentialComponent = GRAVITY * 1.2 * cos(gravityAngle); // Increased gravity effect for better swing
         tangentialSpeed += gravityTangentialComponent * dt;
-        
+
         // Normalize input direction for body control
         double inputLength = sqrt(inputX*inputX + inputY*inputY);
         if (inputLength > 0) {
             inputX /= inputLength;
             inputY /= inputLength;
-            
+
             // Apply input to tangential speed - for body swing control
             double controlForce = 700.0; // Increased force for better swinging
             double swingControl = (inputX * tangentX + inputY * tangentY) * controlForce * dt;
             tangentialSpeed += swingControl;
-            
+
             // Apply slight upward boost when pressing Up, to make higher jumps possible
             if (inputY < 0) {
                 // Apply reduced upward component to the body when pressing up
                 vy -= 40.0 * dt; // Reduced from 80.0
             }
-            
+
             // Add extra horizontal momentum when pressing left/right
             // This helps create more of a tossing motion
             if (inputX != 0) {
@@ -564,7 +706,7 @@ public:
             double boostMultiplier = std::min(1.0, std::abs(dy) / (ROPE_LENGTH * 0.75));
             double boostForce = 250.0 * boostMultiplier; // Increased boost for better jumps
             tangentialSpeed += (tangentialSpeed > 0 ? boostForce : -boostForce) * dt;
-            
+
             // Add slight upward impulse at bottom of swing for better arc (reduced)
             if (std::abs(dx) < ROPE_LENGTH * 0.5) {
                 vy -= 10.0 * boostMultiplier * dt; // Reduced from 20.0
@@ -579,7 +721,7 @@ public:
         dx = x - pivotX;
         dy = y - pivotY;
         distance = sqrt(dx*dx + dy*dy);
-        
+
         if (distance > ROPE_LENGTH) {
             double ratio = ROPE_LENGTH / distance;
             x = pivotX + dx * ratio;
@@ -598,6 +740,63 @@ public:
     void update() {
         // Get keyboard state for swing controls
         const Uint8* keystate = SDL_GetKeyboardState(NULL);
+
+        // Check if character has reached the finish line
+        if (!hasReachedFinish) {
+            // Check if character is inside the finish line area
+            if (x >= SCREEN_WIDTH - 300 && x <= SCREEN_WIDTH - 100 &&  // Between left and right edges
+                y >= 400 && y <= 500) {  // Between top and bottom edges
+                hasReachedFinish = true;
+                // Stop character movement when reaching finish
+                vx = 0;
+                vy = 0;
+            }
+        }
+
+        // Check if character is out of bounds and respawn if needed
+        if (y > SCREEN_HEIGHT + 500 || y < -500 ||
+            x > SCREEN_WIDTH + 500 || x < -500) {
+            // Reset position to initial position
+            x = 300;  // Initial x position
+            y = 100;  // Initial y position
+            vx = 0;
+            vy = 0;
+
+            // Reset hands
+            leftHand.release();
+            rightHand.release();
+
+            // Reset hand positions to initial positions
+            leftHand.parti[0].xCurrent = x - radius;
+            leftHand.parti[0].yCurrent = y;
+            leftHand.parti[0].xPrevious = x - radius;
+            leftHand.parti[0].yPrevious = y;
+
+            rightHand.parti[0].xCurrent = x + radius;
+            rightHand.parti[0].yCurrent = y;
+            rightHand.parti[0].xPrevious = x + radius;
+            rightHand.parti[0].yPrevious = y;
+
+            // Reset all other particles in the ropes
+            for (size_t i = 1; i < leftHand.parti.size(); i++) {
+                leftHand.parti[i].xCurrent = leftHand.parti[0].xCurrent;
+                leftHand.parti[i].yCurrent = leftHand.parti[0].yCurrent;
+                leftHand.parti[i].xPrevious = leftHand.parti[0].xCurrent;
+                leftHand.parti[i].yPrevious = leftHand.parti[0].yCurrent;
+            }
+
+            for (size_t i = 1; i < rightHand.parti.size(); i++) {
+                rightHand.parti[i].xCurrent = rightHand.parti[0].xCurrent;
+                rightHand.parti[i].yCurrent = rightHand.parti[0].yCurrent;
+                rightHand.parti[i].xPrevious = rightHand.parti[0].xCurrent;
+                rightHand.parti[i].yPrevious = rightHand.parti[0].yCurrent;
+            }
+
+            // Reset swing tracking
+            maxSwingSpeed = 0;
+            swingEnergy = 0;
+            return;
+        }
 
         // Update movement direction based on input
         if (keystate[SDL_SCANCODE_LEFT]) facingDirection = -1.0;
@@ -626,10 +825,10 @@ public:
             if (swingSpeed > maxSwingSpeed) {
                 maxSwingSpeed = swingSpeed;
             }
-            
+
             // Update swing energy based on current velocity
             swingEnergy = 0.8 * swingEnergy + 0.2 * swingSpeed;
-            
+
             // Update facing direction based on movement if significant
             if (abs(vx) > 50.0) {
                 facingDirection = (vx > 0) ? 1.0 : -1.0;
@@ -643,7 +842,7 @@ public:
         // Limit fall speed but allow higher horizontal speed
         if (vy > MAX_SPEED) vy = MAX_SPEED;
         if (abs(vx) > MAX_SPEED * 1.2) vx = (vx > 0) ? MAX_SPEED * 1.2 : -MAX_SPEED * 1.2;
-        
+
         // Apply less drag when swinging for better momentum preservation
         if (leftHand.isGrabbingObject || rightHand.isGrabbingObject) {
             vx *= 0.995; // Very minimal drag during swing
@@ -685,39 +884,39 @@ public:
 
     void release(bool isLeft) {
         double releaseBoost = JUMP_BOOST;
-        
+
         // Calculate boost based on swing energy and direction
         if (swingEnergy > 100) {
             // Additional boost based on accumulated swing energy
             releaseBoost += 0.3 * (swingEnergy / 300.0);
-            
+
             // Cap the boost at a reasonable value
             if (releaseBoost > 2.0) releaseBoost = 2.0;
         }
-        
+
         // Use the tracked facing direction for forward toss
         double forwardDir = facingDirection;
-        
+
         // Apply the boost to horizontal velocity - enhanced forward boost
         vx *= releaseBoost;
-        
+
         // Add extra forward momentum (tossing effect)
         vx += forwardDir * FORWARD_TOSS;
-        
+
         // Apply the boost to vertical velocity with a reduced upward component
         vy *= releaseBoost * 0.85; // Reduced vertical boost multiplier
-        
+
         // Add a smaller upward impulse to help reach the next object
         // but less if we're going forward fast (more horizontal trajectory)
         double upwardBoost = UPWARD_BOOST;
         double horizontalFactor = std::min(1.0, std::abs(vx) / 500.0); // How much we're moving horizontally
         upwardBoost *= (1.0 - 0.5 * horizontalFactor); // Reduce upward boost more when moving fast horizontally
-        
+
         vy -= upwardBoost; // Negative is upward
-        
+
         // Reset swing tracking after releasing
         maxSwingSpeed = 0;
-        
+
         // Release the hand
         if (isLeft) leftHand.release();
         else rightHand.release();
@@ -751,7 +950,18 @@ public:
         for (const auto& platform : platforms) {
             SDL_Rect collisionRect = platform.rect;
 
-            // Check collision between character and platform
+            // Special handling for finish line platform
+            if (platform.rect.x == SCREEN_WIDTH - 300) {  // Check if this is the finish line platform
+                // Check if character is inside the finish line area
+                if (x >= platform.rect.x && x <= platform.rect.x + platform.rect.w &&
+                    y >= platform.rect.y && y <= platform.rect.y + platform.rect.h) {
+                    hasReachedFinish = true;
+                    // Don't apply normal collision for finish line
+                    continue;
+                }
+            }
+
+            // Normal collision handling for other platforms
             double characterLeft = x - radius;
             double characterRight = x + radius;
             double characterTop = y - radius;
@@ -814,5 +1024,28 @@ public:
         rightHand.render(renderer);
     }
 };
+
+void renderPlatform(SDL_Renderer* renderer, SDL_Texture* texture, SDL_Rect rect) {
+    // Apply jitter effect
+    int jitterX = rand() % 3 - 1; // Random offset between -1 and 1
+    int jitterY = rand() % 3 - 1; // Random offset between -1 and 1
+
+    // Apply wobble effect
+    double wobble = sin(SDL_GetTicks() / 100.0) * 5; // Wobble angle
+
+    // Adjust rectangle for jitter
+    SDL_Rect jitteredRect = {
+        rect.x + jitterX,
+        rect.y + jitterY,
+        rect.w,
+        rect.h
+    };
+
+    // Calculate center point for rotation
+    SDL_Point center = {rect.w / 2, rect.h / 2};
+
+    // Render with rotation and wobble
+    SDL_RenderCopyEx(renderer, texture, NULL, &jitteredRect, wobble, &center, SDL_FLIP_NONE);
+}
 
 #endif
