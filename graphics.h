@@ -88,6 +88,7 @@ struct Graphics {
     SDL_Renderer *renderer;
     SDL_Window *window;
     std::vector<Platform> platforms;
+    SDL_Texture* congratTexture;  // Add texture for congratulations screen
 
     void logErrorAndExit(const char* msg, const char* error)
     {
@@ -98,6 +99,14 @@ struct Graphics {
     void init() {
         if (SDL_Init(SDL_INIT_EVERYTHING) != 0)
             logErrorAndExit("SDL_Init", SDL_GetError());
+
+        // Initialize SDL_image
+        int imgFlags = IMG_INIT_PNG;
+        if (!(IMG_Init(imgFlags) & imgFlags)) {
+            printf("SDL_image could not initialize! SDL_image Error: %s\n", IMG_GetError());
+            SDL_Quit();
+            return;
+        }
 
         window = SDL_CreateWindow(WINDOW_TITLE, SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED, SCREEN_WIDTH, SCREEN_HEIGHT, SDL_WINDOW_SHOWN);
 
@@ -112,6 +121,15 @@ struct Graphics {
 
         SDL_SetHint(SDL_HINT_RENDER_SCALE_QUALITY, "linear");
         SDL_RenderSetLogicalSize(renderer, SCREEN_WIDTH, SCREEN_HEIGHT);
+
+        // Load congratulations texture
+        congratTexture = IMG_LoadTexture(renderer, "F:\\Game\\congrat.png");
+        if (!congratTexture) {
+            printf("Failed to load congratulations texture: %s\n", IMG_GetError());
+            printf("Attempted to load from: F:\\Game\\congrat.png\n");
+        } else {
+            printf("Successfully loaded congratulations texture\n");
+        }
 
         // Load platform texture
         SDL_Texture* platformTexture = IMG_LoadTexture(renderer, "F:\\Game\\platform.png");
@@ -135,7 +153,7 @@ struct Graphics {
         }
 
         // Add finish line on the right side
-        SDL_Texture* finishTexture = IMG_LoadTexture(renderer, "F:\\Game\\finishline.png");
+        SDL_Texture* finishTexture = IMG_LoadTexture(renderer, "F:\\Game\\finish.png");
         if (finishTexture) {
             SDL_Rect finishRect = {
                 SCREEN_WIDTH - 300,  // Moved more to the left
@@ -165,7 +183,30 @@ struct Graphics {
         }
     }
 
+    void renderCongratulations() {
+        if (congratTexture) {
+            // Center the congratulations image on screen but make it smaller
+            int w, h;
+            SDL_QueryTexture(congratTexture, NULL, NULL, &w, &h);
+            
+            // Scale down the image to half size
+            w = w / 2;
+            h = h / 2;
+            
+            SDL_Rect destRect = {
+                SCREEN_WIDTH/2 - w/2,  // Center horizontally
+                SCREEN_HEIGHT/2 - h/2, // Center vertically
+                w,                     // Scaled width
+                h                      // Scaled height
+            };
+            SDL_RenderCopy(renderer, congratTexture, NULL, &destRect);
+        }
+    }
+
     ~Graphics() {
+        if (congratTexture) {
+            SDL_DestroyTexture(congratTexture);
+        }
         for (auto& platform : platforms) {
             if (platform.texture) {
                 SDL_DestroyTexture(platform.texture);
@@ -487,7 +528,8 @@ public:
     ropehand leftHand;
     ropehand rightHand;
     SDL_Texture *texture;
-    bool hasReachedFinish;  // New flag to track completion
+    bool hasReachedFinish;
+    bool showingCongratulations;  // New flag for congratulations state
 
     // Physics constants
     const double dt = 0.016;             // Time step
@@ -517,7 +559,8 @@ public:
           // Initialize hands at the edges of the character with medium length ropes (35 pixels)
           leftHand(renderer, startX - r, startX - r - 35, startY - 500, startY - 500 - 35, handParticles, true),
           rightHand(renderer, startX + r, startX + r + 35, startY - 500, startY - 500 - 35, handParticles, false),
-          hasReachedFinish(false)  // Initialize completion flag
+          hasReachedFinish(false),
+          showingCongratulations(false)  // Initialize new flag
     {
         const char* texturePath = "F:\\Game\\character.png";
 
@@ -747,10 +790,33 @@ public:
             if (x >= SCREEN_WIDTH - 300 && x <= SCREEN_WIDTH - 100 &&  // Between left and right edges
                 y >= 400 && y <= 500) {  // Between top and bottom edges
                 hasReachedFinish = true;
+                showingCongratulations = true;
                 // Stop character movement when reaching finish
                 vx = 0;
                 vy = 0;
+                return;  // Skip rest of update when showing congratulations
             }
+        }
+
+        // If showing congratulations, only check for C or Q keys
+        if (showingCongratulations) {
+            if (keystate[SDL_SCANCODE_C]) {
+                // Reset for next level
+                hasReachedFinish = false;
+                showingCongratulations = false;
+                x = 300;  // Reset position
+                y = 100;
+                vx = 0;
+                vy = 0;
+                leftHand.release();
+                rightHand.release();
+            }
+            else if (keystate[SDL_SCANCODE_Q]) {
+                SDL_Event quitEvent;
+                quitEvent.type = SDL_QUIT;
+                SDL_PushEvent(&quitEvent);
+            }
+            return;
         }
 
         // Check if character is out of bounds and respawn if needed
@@ -766,30 +832,21 @@ public:
             leftHand.release();
             rightHand.release();
 
-            // Reset hand positions to initial positions
-            leftHand.parti[0].xCurrent = x - radius;
-            leftHand.parti[0].yCurrent = y;
-            leftHand.parti[0].xPrevious = x - radius;
-            leftHand.parti[0].yPrevious = y;
-
-            rightHand.parti[0].xCurrent = x + radius;
-            rightHand.parti[0].yCurrent = y;
-            rightHand.parti[0].xPrevious = x + radius;
-            rightHand.parti[0].yPrevious = y;
-
-            // Reset all other particles in the ropes
-            for (size_t i = 1; i < leftHand.parti.size(); i++) {
-                leftHand.parti[i].xCurrent = leftHand.parti[0].xCurrent;
-                leftHand.parti[i].yCurrent = leftHand.parti[0].yCurrent;
-                leftHand.parti[i].xPrevious = leftHand.parti[0].xCurrent;
-                leftHand.parti[i].yPrevious = leftHand.parti[0].yCurrent;
+            // Reset hand positions relative to character position
+            for (size_t i = 0; i < leftHand.parti.size(); i++) {
+                double t = static_cast<double>(i) / (leftHand.parti.size() - 1);
+                leftHand.parti[i].xCurrent = x - radius - (35 * t);  // Spread particles left
+                leftHand.parti[i].yCurrent = y;
+                leftHand.parti[i].xPrevious = leftHand.parti[i].xCurrent;
+                leftHand.parti[i].yPrevious = leftHand.parti[i].yCurrent;
             }
 
-            for (size_t i = 1; i < rightHand.parti.size(); i++) {
-                rightHand.parti[i].xCurrent = rightHand.parti[0].xCurrent;
-                rightHand.parti[i].yCurrent = rightHand.parti[0].yCurrent;
-                rightHand.parti[i].xPrevious = rightHand.parti[0].xCurrent;
-                rightHand.parti[i].yPrevious = rightHand.parti[0].yCurrent;
+            for (size_t i = 0; i < rightHand.parti.size(); i++) {
+                double t = static_cast<double>(i) / (rightHand.parti.size() - 1);
+                rightHand.parti[i].xCurrent = x + radius + (35 * t);  // Spread particles right
+                rightHand.parti[i].yCurrent = y;
+                rightHand.parti[i].xPrevious = rightHand.parti[i].xCurrent;
+                rightHand.parti[i].yPrevious = rightHand.parti[i].yCurrent;
             }
 
             // Reset swing tracking
@@ -950,18 +1007,7 @@ public:
         for (const auto& platform : platforms) {
             SDL_Rect collisionRect = platform.rect;
 
-            // Special handling for finish line platform
-            if (platform.rect.x == SCREEN_WIDTH - 300) {  // Check if this is the finish line platform
-                // Check if character is inside the finish line area
-                if (x >= platform.rect.x && x <= platform.rect.x + platform.rect.w &&
-                    y >= platform.rect.y && y <= platform.rect.y + platform.rect.h) {
-                    hasReachedFinish = true;
-                    // Don't apply normal collision for finish line
-                    continue;
-                }
-            }
-
-            // Normal collision handling for other platforms
+            // Normal collision handling for all platforms
             double characterLeft = x - radius;
             double characterRight = x + radius;
             double characterTop = y - radius;
@@ -975,6 +1021,15 @@ public:
             // Check if there is any overlap
             if (characterRight > platformLeft && characterLeft < platformRight &&
                 characterBottom > platformTop && characterTop < platformBottom) {
+
+                // Check if this is the finish line platform first
+                if (platform.rect.x == SCREEN_WIDTH - 300) {
+                    hasReachedFinish = true;
+                    showingCongratulations = true;
+                    vx = 0;
+                    vy = 0;
+                    return;  // Skip normal collision handling for finish line
+                }
 
                 // Calculate overlap amounts
                 double overlapLeft = characterRight - platformLeft;

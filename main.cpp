@@ -27,19 +27,19 @@ int SDL_main(int argc, char* argv[]) {
     MenuPanel menu(graphics.renderer, 0, 0, 0, 0);  // Position and size are handled internally
 
     // Add menu items
-    menu.addItem("Start Game", []() {
+    menu.addItem("F:\\Game\\startbut.png", []() {
         // This will be handled in the main loop
     });
 
-    menu.addItem("Options", []() {
+    menu.addItem("F:\\Game\\optionsbut.png", []() {
         // This will be handled in the main loop
     });
 
-    menu.addItem("How to Play", []() {
+    menu.addItem("F:\\Game\\waybut.png", []() {
         // This will be handled in the main loop
     });
 
-    menu.addItem("Quit Game", []() {
+    menu.addItem("F:\\Game\\quitbut.png", []() {
         // This will be handled in the main loop
     });
 
@@ -53,11 +53,13 @@ int SDL_main(int argc, char* argv[]) {
             if (event.type == SDL_QUIT) {
                 running = false;
             }
-            
+
             if (currentState == MENU) {
                 menu.handleEvent(event);
-                
-                if (event.type == SDL_KEYDOWN && event.key.keysym.scancode == SDL_SCANCODE_RETURN) {
+
+                // Handle both keyboard and mouse events for menu state changes
+                if ((event.type == SDL_KEYDOWN && event.key.keysym.scancode == SDL_SCANCODE_RETURN) ||
+                    (event.type == SDL_MOUSEBUTTONDOWN && event.button.button == SDL_BUTTON_LEFT)) {
                     switch (menu.getSelectedIndex()) {
                         case 0:  // Start Game
                             currentState = PLAYING;
@@ -120,6 +122,11 @@ int SDL_main(int argc, char* argv[]) {
             player.handlecollision(graphics.platforms);
             graphics.renderPlatforms();
             player.render(graphics.renderer);
+
+            // If character has reached finish line, render congratulations screen
+            if (player.showingCongratulations) {
+                graphics.renderCongratulations();
+            }
         }
         else if (currentState == OPTIONS) {
             // TODO: Render options screen
