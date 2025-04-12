@@ -810,6 +810,23 @@ public:
                 vy = 0;
                 leftHand.release();
                 rightHand.release();
+
+                // Reset hand positions relative to character position
+                for (size_t i = 0; i < leftHand.parti.size(); i++) {
+                    double t = static_cast<double>(i) / (leftHand.parti.size() - 1);
+                    leftHand.parti[i].xCurrent = x - radius - (35 * t);  // Spread particles left
+                    leftHand.parti[i].yCurrent = y;
+                    leftHand.parti[i].xPrevious = leftHand.parti[i].xCurrent;
+                    leftHand.parti[i].yPrevious = leftHand.parti[i].yCurrent;
+                }
+
+                for (size_t i = 0; i < rightHand.parti.size(); i++) {
+                    double t = static_cast<double>(i) / (rightHand.parti.size() - 1);
+                    rightHand.parti[i].xCurrent = x + radius + (35 * t);  // Spread particles right
+                    rightHand.parti[i].yCurrent = y;
+                    rightHand.parti[i].xPrevious = rightHand.parti[i].xCurrent;
+                    rightHand.parti[i].yPrevious = rightHand.parti[i].yCurrent;
+                }
             }
             else if (keystate[SDL_SCANCODE_Q]) {
                 SDL_Event quitEvent;
