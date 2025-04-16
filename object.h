@@ -15,9 +15,9 @@ struct GameObject {
     bool isGrabbable;
 
     GameObject(SDL_Renderer* renderer, double startX, double startY, double w, double h, bool grabbable = true)
-        : x(startX), y(startY), width(w), height(h), texture(nullptr), isGrabbable(grabbable)
+        : x(startX), y(startY), width(w), height(h), isGrabbable(grabbable), texture(nullptr)
     {
-        const char* texturePath = "F:\\Game\\platform.png";
+        const char* texturePath = "F:\\Game\\graphic\\platform.png";
 
         SDL_Surface* surface = IMG_Load(texturePath);
         if (surface) {

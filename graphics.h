@@ -28,7 +28,7 @@ struct GameObject {
     GameObject(SDL_Renderer* renderer, double startX, double startY, double w, double h, bool grabbable = true)
         : x(startX), y(startY), width(w), height(h), isGrabbable(grabbable), texture(nullptr)
     {
-        const char* texturePath = "F:\\Game\\platform.png";
+        const char* texturePath = "F:\\Game\\graphic\\platform.png";
 
         SDL_Surface* surface = IMG_Load(texturePath);
         if (surface) {
@@ -129,16 +129,16 @@ struct Graphics {
         SDL_RenderSetLogicalSize(renderer, SCREEN_WIDTH, SCREEN_HEIGHT);
 
         // Load congratulations texture
-        congratulationsTexture = IMG_LoadTexture(renderer, "F:\\Game\\congrat.png");
+        congratulationsTexture = IMG_LoadTexture(renderer, "F:\\Game\\graphic\\congrat.png");
         if (!congratulationsTexture) {
             printf("Failed to load congratulations texture: %s\n", IMG_GetError());
-            printf("Attempted to load from: F:\\Game\\congrat.png\n");
+            printf("Attempted to load from: F:\\Game\\graphic\\congrat.png\n");
         } else {
             printf("Successfully loaded congratulations texture\n");
         }
 
         // Load platform texture
-        SDL_Texture* platformTexture = IMG_LoadTexture(renderer, "F:\\Game\\platform.png");
+        SDL_Texture* platformTexture = IMG_LoadTexture(renderer, "F:\\Game\\graphic\\platform.png");
         if (platformTexture) {
             // Add single platform
             SDL_Rect platformRect = {300, 300, 200, 20};
@@ -146,7 +146,7 @@ struct Graphics {
         }
 
         // Load square thing texture
-        SDL_Texture* squareTexture = IMG_LoadTexture(renderer, "F:\\Game\\squarething.png");
+        SDL_Texture* squareTexture = IMG_LoadTexture(renderer, "F:\\Game\\graphic\\squarething.png");
         if (squareTexture) {
             // Add square thing at the very top of the screen
             SDL_Rect squareRect = {
@@ -159,7 +159,7 @@ struct Graphics {
         }
 
         // Add finish line on the right side
-        SDL_Texture* finishTexture = IMG_LoadTexture(renderer, "F:\\Game\\finish.png");
+        SDL_Texture* finishTexture = IMG_LoadTexture(renderer, "F:\\Game\\graphic\\finish.png");
         if (finishTexture) {
             SDL_Rect finishRect = {
                 SCREEN_WIDTH - 300,  // Moved more to the left
@@ -171,7 +171,7 @@ struct Graphics {
         }
 
         // Load guide image
-        guideTexture = IMG_LoadTexture(renderer, "F:\\Game\\guidefinalroi.png");
+        guideTexture = IMG_LoadTexture(renderer, "F:\\Game\\graphic\\guidefinalroi.png");
         if (guideTexture == nullptr) {
             SDL_LogMessage(SDL_LOG_CATEGORY_APPLICATION,
                           SDL_LOG_PRIORITY_ERROR,
@@ -219,7 +219,7 @@ struct Graphics {
 
     void renderHowToPlay() {
         if (guideTexture == nullptr) {
-            guideTexture = IMG_LoadTexture(renderer, "F:\\Game\\guidefinalroi.png");
+            guideTexture = IMG_LoadTexture(renderer, "F:\\Game\\graphic\\guidefinalroi.png");
             if (guideTexture == nullptr) {
                 logErrorAndExit("Could not load guide image", IMG_GetError());
             }
@@ -274,7 +274,7 @@ public:
         currentLength = maxLength;
 
         // Load release hand texture based on hand type
-        const char* releasePath = isLeft ? "F:\\Game\\lefthandrelease.png" : "F:\\Game\\righthandrelease.png";
+        const char* releasePath = isLeft ? "F:\\Game\\graphic\\lefthandrelease.png" : "F:\\Game\\graphic\\righthandrelease.png";
         SDL_Surface* surface = IMG_Load(releasePath);
         if (surface) {
             handTexture = SDL_CreateTextureFromSurface(renderer, surface);
@@ -285,7 +285,7 @@ public:
         }
 
         // Load grab hand texture based on hand type
-        const char* grabPath = isLeft ? "F:\\Game\\grableft.png" : "F:\\Game\\grabright.png";
+        const char* grabPath = isLeft ? "F:\\Game\\graphic\\grableft.png" : "F:\\Game\\graphic\\grabright.png";
         surface = IMG_Load(grabPath);
         if (surface) {
             grabTexture = SDL_CreateTextureFromSurface(renderer, surface);
@@ -585,7 +585,7 @@ public:
           hasReachedFinish(false),
           showingCongratulations(false)  // Initialize new flag
     {
-        const char* texturePath = "F:\\Game\\character.png";
+        const char* texturePath = "F:\\Game\\graphic\\character.png";
 
         // Try to load the image first
         SDL_Surface* originalSurface = IMG_Load(texturePath);

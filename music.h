@@ -7,6 +7,7 @@ private:
     Mix_Chunk* grabSound;
     Mix_Chunk* fallSound;
     Mix_Chunk* applauseSound;
+    Mix_Chunk* congratsSound;
     bool isGrabSoundPlaying;
     bool isFalling;
     bool hasPlayedApplause;
@@ -15,7 +16,8 @@ private:
 
 public:
     Music() : gMusic(nullptr), grabSound(nullptr), fallSound(nullptr), applauseSound(nullptr),
-              isGrabSoundPlaying(false), isFalling(false), hasPlayedApplause(false), respawnTime(0) {}
+              congratsSound(nullptr), isGrabSoundPlaying(false), isFalling(false), 
+              hasPlayedApplause(false), respawnTime(0) {}
 
     Mix_Music* loadMusic(const char* path) {
         gMusic = Mix_LoadMUS(path);
@@ -54,6 +56,15 @@ public:
             SDL_LogMessage(SDL_LOG_CATEGORY_APPLICATION,
                           SDL_LOG_PRIORITY_ERROR,
                           "Could not load applause sound effect! SDL_mixer Error: %s", Mix_GetError());
+        }
+    }
+
+    void loadCongratsSound(const char* path) {
+        congratsSound = Mix_LoadWAV(path);
+        if (congratsSound == nullptr) {
+            SDL_LogMessage(SDL_LOG_CATEGORY_APPLICATION,
+                          SDL_LOG_PRIORITY_ERROR,
+                          "Could not load congrats sound effect! SDL_mixer Error: %s", Mix_GetError());
         }
     }
 
@@ -113,6 +124,12 @@ public:
         hasPlayedApplause = false;
     }
 
+    void playCongratsSound() {
+        if (congratsSound != nullptr) {
+            Mix_PlayChannel(-1, congratsSound, 0);
+        }
+    }
+
     void pause() {
         if (Mix_PlayingMusic() == 1) {
             Mix_PauseMusic();
@@ -139,6 +156,10 @@ public:
         if (applauseSound != nullptr) {
             Mix_FreeChunk(applauseSound);
             applauseSound = nullptr;
+        }
+        if (congratsSound != nullptr) {
+            Mix_FreeChunk(congratsSound);
+            congratsSound = nullptr;
         }
     }
 };

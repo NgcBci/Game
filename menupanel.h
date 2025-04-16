@@ -22,10 +22,9 @@ private:
     SDL_Texture* backgroundTexture;  // Background texture for right side
 
 public:
-    MenuPanel(SDL_Renderer* renderer, int x, int y, int width, int height)
-        : renderer(renderer), selectedIndex(0), backgroundTexture(nullptr) {
+    MenuPanel(SDL_Renderer* renderer) : renderer(renderer), selectedIndex(0), backgroundTexture(nullptr) {
         // Load background texture
-        backgroundTexture = IMG_LoadTexture(renderer, "F:\\Game\\swingngrip.png");
+        backgroundTexture = IMG_LoadTexture(renderer, "F:\\Game\\graphic\\swingngrip.png");
         if (!backgroundTexture) {
             printf("Failed to load background texture: %s\n", IMG_GetError());
         }

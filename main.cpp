@@ -35,24 +35,24 @@ int SDL_main(int argc, char* argv[]) {
     // Create character with medium radius (30 pixels = 60x60 total size)
     Character player(graphics.renderer, 300, 100, 30, 10);  // x, y, radius=30, particles=10
 
-    // Create menu panel
-    MenuPanel menu(graphics.renderer, 0, 0, 0, 0);  // Position and size are handled internally
+    // Initialize menu
+    MenuPanel menu(graphics.renderer);
 
     // Add menu items
-    menu.addItem("F:\\Game\\startbut.png", []() {
-        // This will be handled in the main loop
+    menu.addItem("F:\\Game\\graphic\\startbut.png", []() {
+        // Start game logic
     });
 
-    menu.addItem("F:\\Game\\optionsbut.png", []() {
-        // This will be handled in the main loop
+    menu.addItem("F:\\Game\\graphic\\optionsbut.png", []() {
+        // Options logic
     });
 
-    menu.addItem("F:\\Game\\waybut.png", []() {
-        // This will be handled in the main loop
+    menu.addItem("F:\\Game\\graphic\\waybut.png", []() {
+        // How to play logic
     });
 
-    menu.addItem("F:\\Game\\quitbut.png", []() {
-        // This will be handled in the main loop
+    menu.addItem("F:\\Game\\graphic\\quitbut.png", []() {
+        // Quit game logic
     });
 
     // Initialize music
@@ -61,6 +61,7 @@ int SDL_main(int argc, char* argv[]) {
     backgroundMusic.loadSound("F:\\Game\\sounds\\grabbing.mp3");
     backgroundMusic.loadFallSound("F:\\Game\\sounds\\huhu.mp3");
     backgroundMusic.loadApplauseSound("F:\\Game\\sounds\\applause.mp3");
+    backgroundMusic.loadCongratsSound("F:\\Game\\sounds\\congrats.mp3");
     backgroundMusic.play();
 
     bool running = true;
