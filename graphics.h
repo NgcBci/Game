@@ -87,8 +87,14 @@ struct Platform {
 struct Graphics {
     SDL_Renderer *renderer;
     SDL_Window *window;
+    SDL_Texture* characterTexture;
+    SDL_Texture* handTexture;
+    SDL_Texture* congratulationsTexture;
+    SDL_Texture* guideTexture;  // Add guide texture
     std::vector<Platform> platforms;
-    SDL_Texture* congratTexture;  // Add texture for congratulations screen
+
+    Graphics() : window(nullptr), renderer(nullptr), characterTexture(nullptr), 
+                handTexture(nullptr), congratulationsTexture(nullptr), guideTexture(nullptr) {}
 
     void logErrorAndExit(const char* msg, const char* error)
     {
@@ -123,8 +129,8 @@ struct Graphics {
         SDL_RenderSetLogicalSize(renderer, SCREEN_WIDTH, SCREEN_HEIGHT);
 
         // Load congratulations texture
-        congratTexture = IMG_LoadTexture(renderer, "F:\\Game\\congrat.png");
-        if (!congratTexture) {
+        congratulationsTexture = IMG_LoadTexture(renderer, "F:\\Game\\congrat.png");
+        if (!congratulationsTexture) {
             printf("Failed to load congratulations texture: %s\n", IMG_GetError());
             printf("Attempted to load from: F:\\Game\\congrat.png\n");
         } else {
@@ -163,6 +169,14 @@ struct Graphics {
             };
             platforms.push_back(Platform(finishRect, finishTexture));
         }
+
+        // Load guide image
+        guideTexture = IMG_LoadTexture(renderer, "F:\\Game\\guidefinalroi.png");
+        if (guideTexture == nullptr) {
+            SDL_LogMessage(SDL_LOG_CATEGORY_APPLICATION,
+                          SDL_LOG_PRIORITY_ERROR,
+                          "Could not load guide image! SDL_Error: %s", SDL_GetError());
+        }
     }
 
     void renderPlatforms() {
@@ -184,28 +198,50 @@ struct Graphics {
     }
 
     void renderCongratulations() {
-        if (congratTexture) {
+        if (congratulationsTexture) {
             // Center the congratulations image on screen but make it smaller
             int w, h;
-            SDL_QueryTexture(congratTexture, NULL, NULL, &w, &h);
-            
+            SDL_QueryTexture(congratulationsTexture, NULL, NULL, &w, &h);
+
             // Scale down the image to half size
             w = w / 2;
             h = h / 2;
-            
+
             SDL_Rect destRect = {
                 SCREEN_WIDTH/2 - w/2,  // Center horizontally
                 SCREEN_HEIGHT/2 - h/2, // Center vertically
                 w,                     // Scaled width
                 h                      // Scaled height
             };
-            SDL_RenderCopy(renderer, congratTexture, NULL, &destRect);
+            SDL_RenderCopy(renderer, congratulationsTexture, NULL, &destRect);
         }
     }
 
+    void renderHowToPlay() {
+        if (guideTexture == nullptr) {
+            guideTexture = IMG_LoadTexture(renderer, "F:\\Game\\guidefinalroi.png");
+            if (guideTexture == nullptr) {
+                logErrorAndExit("Could not load guide image", IMG_GetError());
+            }
+        }
+
+        int guideWidth, guideHeight;
+        SDL_QueryTexture(guideTexture, NULL, NULL, &guideWidth, &guideHeight);
+
+        // Center the guide image on screen
+        SDL_Rect guideRect = {
+            (SCREEN_WIDTH - guideWidth) / 2,
+            (SCREEN_HEIGHT - guideHeight) / 2 + 25, // Decreased from 30 to 25 to move it up 5 more pixels
+            guideWidth,
+            guideHeight
+        };
+
+        SDL_RenderCopy(renderer, guideTexture, NULL, &guideRect);
+    }
+
     ~Graphics() {
-        if (congratTexture) {
-            SDL_DestroyTexture(congratTexture);
+        if (congratulationsTexture) {
+            SDL_DestroyTexture(congratulationsTexture);
         }
         for (auto& platform : platforms) {
             if (platform.texture) {
@@ -214,6 +250,10 @@ struct Graphics {
         }
         if (renderer) SDL_DestroyRenderer(renderer);
         if (window) SDL_DestroyWindow(window);
+        if (guideTexture != nullptr) {
+            SDL_DestroyTexture(guideTexture);
+            guideTexture = nullptr;
+        }
     }
 };
 
@@ -530,23 +570,6 @@ public:
     SDL_Texture *texture;
     bool hasReachedFinish;
     bool showingCongratulations;  // New flag for congratulations state
-
-    // Physics constants
-    const double dt = 0.016;             // Time step
-    const double GRAVITY = 170.0;        // Reduced gravity for better jumping arcs
-    const double DRAG = 0.99;            // Minimal drag to preserve momentum
-    const double MAX_SPEED = 1200.0;     // Increased for better jumping between platforms
-    const double HAND_FORCE = 800.0;     // Force for climbing
-    const double FLAP_LIFT = 150.0;      // Body lift for climbing
-    const double ROPE_LENGTH = 120.0;    // Fixed rope length for consistent climbing
-    const double ROPE_STIFFNESS = 150.0; // Spring force for rope
-    const double HAND_MASS = 1.0;        // Hand mass
-    const double BODY_MASS = 3.0;        // Body mass
-    const double SWING_BOOST = 1.5;      // Momentum boost when swinging aggressively
-    const double JUMP_BOOST = 1.4;       // Increased velocity boost for better tossing
-    const double FORWARD_TOSS = 300.0;   // Forward momentum when releasing
-    const double UPWARD_BOOST = 80.0;    // Reduced upward boost when releasing
-
     // Track swing state and movement
     double lastSwingAngle = 0;
     double maxSwingSpeed = 0;

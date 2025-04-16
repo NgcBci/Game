@@ -1,11 +1,13 @@
 #include <SDL.h>
 #include <SDL_image.h>
+#include <SDL_mixer.h>
 #include <iostream>
 #include <vector>
 #include <cmath>
 #include "defs.h"
 #include "graphics.h"
 #include "menupanel.h"
+#include "music.h"
 
 using namespace std;
 
@@ -17,6 +19,16 @@ enum GameState {
 };
 
 int SDL_main(int argc, char* argv[]) {
+    if (SDL_Init(SDL_INIT_VIDEO | SDL_INIT_AUDIO) < 0) {
+        std::cerr << "SDL could not initialize! SDL_Error: " << SDL_GetError() << std::endl;
+        return 1;
+    }
+
+    if (Mix_OpenAudio(44100, MIX_DEFAULT_FORMAT, 2, 2048) < 0) {
+        std::cerr << "SDL_mixer could not initialize! SDL_mixer Error: " << Mix_GetError() << std::endl;
+        return 1;
+    }
+
     Graphics graphics;
     graphics.init();
 
@@ -42,6 +54,14 @@ int SDL_main(int argc, char* argv[]) {
     menu.addItem("F:\\Game\\quitbut.png", []() {
         // This will be handled in the main loop
     });
+
+    // Initialize music
+    Music backgroundMusic;
+    backgroundMusic.loadMusic("F:\\Game\\sounds\\bgmusic.mp3");
+    backgroundMusic.loadSound("F:\\Game\\sounds\\grabbing.mp3");
+    backgroundMusic.loadFallSound("F:\\Game\\sounds\\huhu.mp3");
+    backgroundMusic.loadApplauseSound("F:\\Game\\sounds\\applause.mp3");
+    backgroundMusic.play();
 
     bool running = true;
     GameState currentState = MENU;
@@ -81,9 +101,15 @@ int SDL_main(int argc, char* argv[]) {
                     switch (event.key.keysym.scancode) {
                         case SDL_SCANCODE_A:  // Left hand grab
                             player.grab(true, graphics.platforms);
+                            if (!event.key.repeat) {  // Only play sound on initial press, not repeat
+                                backgroundMusic.playGrabSound();
+                            }
                             break;
                         case SDL_SCANCODE_D:  // Right hand grab
                             player.grab(false, graphics.platforms);
+                            if (!event.key.repeat) {  // Only play sound on initial press, not repeat
+                                backgroundMusic.playGrabSound();
+                            }
                             break;
                         case SDL_SCANCODE_ESCAPE:  // Return to menu
                             currentState = MENU;
@@ -123,9 +149,14 @@ int SDL_main(int argc, char* argv[]) {
             graphics.renderPlatforms();
             player.render(graphics.renderer);
 
-            // If character has reached finish line, render congratulations screen
+            // Play falling sound when character is falling freely
+            bool isFalling = !player.leftHand.isGrabbingObject && !player.rightHand.isGrabbingObject && player.vy > 0;
+            backgroundMusic.playFallSound(isFalling);
+
+            // If character has reached finish line, render congratulations screen and play applause
             if (player.showingCongratulations) {
                 graphics.renderCongratulations();
+                backgroundMusic.playApplauseSound();
             }
         }
         else if (currentState == OPTIONS) {
@@ -135,10 +166,8 @@ int SDL_main(int argc, char* argv[]) {
             SDL_RenderFillRect(graphics.renderer, &optionsRect);
         }
         else if (currentState == HOWTOPLAY) {
-            // TODO: Render how to play screen
-            SDL_SetRenderDrawColor(graphics.renderer, 0, 0, 0, 255);
-            SDL_Rect howToPlayRect = {SCREEN_WIDTH/2 - 200, SCREEN_HEIGHT/2 - 100, 400, 200};
-            SDL_RenderFillRect(graphics.renderer, &howToPlayRect);
+            // Render how to play screen with guide image
+            graphics.renderHowToPlay();
         }
 
         // Present the frame
@@ -151,6 +180,7 @@ int SDL_main(int argc, char* argv[]) {
     // Cleanup
     SDL_DestroyRenderer(graphics.renderer);
     SDL_DestroyWindow(graphics.window);
+    Mix_CloseAudio();
     SDL_Quit();
     return 0;
 }
