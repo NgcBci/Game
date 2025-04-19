@@ -1089,8 +1089,36 @@ public:
             if (characterRight > platformLeft && characterLeft < platformRight &&
                 characterBottom > platformTop && characterTop < platformBottom) {
 
-                // Note: Finish line detection is now handled directly in main.cpp
-                // to better control level-specific behavior
+                // Get the texture file path (using SDL_GetHint because SDL doesn't provide
+                // direct access to the original file path)
+                // Instead, we'll use position and screen index to identify the finish line
+
+                // For Level 1, finish line is on screen 0 at position SCREEN_WIDTH - 300
+                // For Level 2, finish line is at position 5300 (based on level_platforms.h)
+                bool isFinishLine = false;
+                
+                // Get unique platform index in the platforms array
+                int platformIndex = &platform - &platforms[0];
+                
+                // Check if it's the finish line in Level 1
+                if (screenIndex == 0 && 
+                    platformIndex == 2 && // Finish line is the 3rd platform in Level 1
+                    platform.rect.x == SCREEN_WIDTH - 300) {
+                    isFinishLine = true;
+                }
+                // Check if it's the finish line in Level 2
+                else if (platform.rect.x == 5300 && // Finish line position in Level 2
+                         platformIndex == platforms.size() - 1) { // Last platform in the array
+                    isFinishLine = true;
+                }
+                
+                if (isFinishLine) {
+                    hasReachedFinish = true;
+                    showingCongratulations = true;
+                    vx = 0;
+                    vy = 0;
+                    return;  // Skip normal collision handling for finish line
+                }
 
                 // Calculate overlap amounts
                 double overlapLeft = characterRight - platformLeft;
@@ -1148,8 +1176,36 @@ public:
             if (characterRight > platformLeft && characterLeft < platformRight &&
                 characterBottom > platformTop && characterTop < platformBottom) {
 
-                // Note: Finish line detection is now handled directly in main.cpp
-                // to better control level-specific behavior
+                // Get the texture file path (using SDL_GetHint because SDL doesn't provide
+                // direct access to the original file path)
+                // Instead, we'll use position and screen index to identify the finish line
+
+                // For Level 1, finish line is on screen 0 at position SCREEN_WIDTH - 300
+                // For Level 2, finish line is at position 5300 (based on level_platforms.h)
+                bool isFinishLine = false;
+                
+                // Get unique platform index in the platforms array
+                int platformIndex = &platform - &platforms[0];
+                
+                // Check if it's the finish line in Level 1
+                if (screenIndex == 0 && 
+                    platformIndex == 2 && // Finish line is the 3rd platform in Level 1
+                    platform.rect.x == SCREEN_WIDTH - 300) {
+                    isFinishLine = true;
+                }
+                // Check if it's the finish line in Level 2
+                else if (platform.rect.x == 5300 && // Finish line position in Level 2
+                         platformIndex == platforms.size() - 1) { // Last platform in the array
+                    isFinishLine = true;
+                }
+                
+                if (isFinishLine) {
+                    hasReachedFinish = true;
+                    showingCongratulations = true;
+                    vx = 0;
+                    vy = 0;
+                    return;  // Skip normal collision handling for finish line
+                }
 
                 // Calculate overlap amounts
                 double overlapLeft = characterRight - platformLeft;
@@ -1235,6 +1291,10 @@ public:
         // Reset swing tracking
         maxSwingSpeed = 0;
         swingEnergy = 0;
+        
+        // Reset finish state
+        hasReachedFinish = false;
+        showingCongratulations = false;
     }
 };
 

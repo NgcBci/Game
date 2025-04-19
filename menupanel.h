@@ -20,9 +20,13 @@ private:
     std::vector<MenuItem> items;
     int selectedIndex;
     SDL_Texture* backgroundTexture;  // Background texture for right side
+    int x, y, width, height;  // Add position and size members
 
 public:
-    MenuPanel(SDL_Renderer* renderer) : renderer(renderer), selectedIndex(0), backgroundTexture(nullptr) {
+    MenuPanel(SDL_Renderer* renderer, int x, int y, int width, int height)
+        : renderer(renderer), selectedIndex(0), backgroundTexture(nullptr),
+          x(x), y(y), width(width), height(height)  // Initialize position and size
+    {
         // Load background texture
         backgroundTexture = IMG_LoadTexture(renderer, "F:\\Game\\graphic\\swingngrip.png");
         if (!backgroundTexture) {
