@@ -75,12 +75,36 @@ struct Platform {
     SDL_Rect rect;
     SDL_Texture* texture;
     double visualHeight;  // Actual visual height of the platform texture
+    bool isSpike;        // New flag to identify if this platform is a spike
 
-    Platform(SDL_Rect r, SDL_Texture* t) : rect(r), texture(t) {
+    Platform(SDL_Rect r, SDL_Texture* t, bool spike = false) : rect(r), texture(t), isSpike(spike) {
         // Get the actual texture dimensions
         int w, h;
         SDL_QueryTexture(t, NULL, NULL, &w, &h);
         visualHeight = h;
+    }
+};
+
+// Add struct for moving objects like the spike wall
+struct MovingObject {
+    SDL_Rect rect;
+    SDL_Texture* texture;
+    float velocityX;
+    float velocityY;
+    float startX;
+    float startY;
+    
+    MovingObject(SDL_Rect r, SDL_Texture* t, float vx = 0, float vy = 0) : 
+        rect(r), texture(t), velocityX(vx), velocityY(vy), startX(r.x), startY(r.y) {}
+    
+    void update() {
+        rect.x += velocityX;
+        rect.y += velocityY;
+    }
+    
+    void reset() {
+        rect.x = startX;
+        rect.y = startY;
     }
 };
 
@@ -135,39 +159,6 @@ struct Graphics {
             printf("Attempted to load from: F:\\Game\\graphic\\congrat.png\n");
         } else {
             printf("Successfully loaded congratulations texture\n");
-        }
-
-        // Load platform texture
-        SDL_Texture* platformTexture = IMG_LoadTexture(renderer, "F:\\Game\\graphic\\platform.png");
-        if (platformTexture) {
-            // Add single platform
-            SDL_Rect platformRect = {300, 300, 200, 20};
-            platforms.push_back(Platform(platformRect, platformTexture));
-        }
-
-        // Load square thing texture
-        SDL_Texture* squareTexture = IMG_LoadTexture(renderer, "F:\\Game\\graphic\\squarething.png");
-        if (squareTexture) {
-            // Add square thing at the very top of the screen
-            SDL_Rect squareRect = {
-                SCREEN_WIDTH/2 - 200,  // Center horizontally (screen width/2 - half of square width)
-                0,                     // Position at the very top of the screen
-                409,                   // Width
-                307                    // Height
-            };
-            platforms.push_back(Platform(squareRect, squareTexture));
-        }
-
-        // Add finish line on the right side
-        SDL_Texture* finishTexture = IMG_LoadTexture(renderer, "F:\\Game\\graphic\\finish.png");
-        if (finishTexture) {
-            SDL_Rect finishRect = {
-                SCREEN_WIDTH - 300,  // Moved more to the left
-                400,                 // Same y position
-                200,                 // Width
-                100                  // Height
-            };
-            platforms.push_back(Platform(finishRect, finishTexture));
         }
 
         // Load guide image
@@ -577,6 +568,17 @@ public:
     double swingEnergy = 0;
     double facingDirection = 1.0; // 1.0 for right, -1.0 for left
 
+    // External variables from main.cpp that we need to modify
+    static int& getCurrentScreenIndex() {
+        extern int currentScreenIndex;
+        return currentScreenIndex;
+    }
+    
+    static double& getCameraOffsetX() {
+        extern double cameraOffsetX;
+        return cameraOffsetX;
+    }
+
     Character(SDL_Renderer* renderer, double startX, double startY, double r, int handParticles)
         : x(startX), y(startY - 500), vx(0), vy(0), radius(r),  // Start 500 pixels above the platform
           // Initialize hands at the edges of the character with medium length ropes (35 pixels)
@@ -807,20 +809,8 @@ public:
         // Get keyboard state for swing controls
         const Uint8* keystate = SDL_GetKeyboardState(NULL);
 
-        // Check if character has reached the finish line
-        if (!hasReachedFinish) {
-            // Check if character is inside the finish line area
-            if (x >= SCREEN_WIDTH - 300 && x <= SCREEN_WIDTH - 100 &&  // Between left and right edges
-                y >= 400 && y <= 500) {  // Between top and bottom edges
-                hasReachedFinish = true;
-                showingCongratulations = true;
-                // Stop character movement when reaching finish
-                vx = 0;
-                vy = 0;
-                return;  // Skip rest of update when showing congratulations
-            }
-        }
-
+        // Remove hardcoded finish line detection - this is now handled in main.cpp
+        
         // If showing congratulations, only check for C or Q keys
         if (showingCongratulations) {
             if (keystate[SDL_SCANCODE_C]) {
@@ -1074,29 +1064,39 @@ public:
         for (const auto& platform : platforms) {
             SDL_Rect collisionRect = platform.rect;
 
-            // Normal collision handling for all platforms
-            double characterLeft = x - radius;
-            double characterRight = x + radius;
-            double characterTop = y - radius;
-            double characterBottom = y + radius;
-
+            // Get platform corners and edges
             double platformLeft = collisionRect.x;
             double platformRight = collisionRect.x + collisionRect.w;
             double platformTop = collisionRect.y;
             double platformBottom = collisionRect.y + collisionRect.h;
+            
+            // Find the closest point on the platform to the circle center
+            double closestX = std::max(platformLeft, std::min(x, platformRight));
+            double closestY = std::max(platformTop, std::min(y, platformBottom));
+            
+            // Calculate distance between closest point and circle center
+            double distanceX = x - closestX;
+            double distanceY = y - closestY;
+            double distanceSquared = distanceX * distanceX + distanceY * distanceY;
+            
+            // Check if circle collides with platform
+            if (distanceSquared < radius * radius) {
+                // Check if this is a spike platform
+                if (platform.isSpike) {
+                    // Hit a spike, reset player position and go to first screen
+                    getCurrentScreenIndex() = 0;  // Reset to first screen
+                    getCameraOffsetX() = 0;       // Reset camera offset
+                    resetPosition();              // Reset player position
+                    return; // Exit collision check after respawning
+                }
 
-            // Check if there is any overlap
-            if (characterRight > platformLeft && characterLeft < platformRight &&
-                characterBottom > platformTop && characterTop < platformBottom) {
-
-                // Note: Finish line detection is now handled directly in main.cpp
-                // to better control level-specific behavior
+                // Determine finish line based on level (handled in main.cpp)
 
                 // Calculate overlap amounts
-                double overlapLeft = characterRight - platformLeft;
-                double overlapRight = platformRight - characterLeft;
-                double overlapTop = characterBottom - platformTop;
-                double overlapBottom = platformBottom - characterTop;
+                double overlapLeft = x + radius - platformLeft;
+                double overlapRight = platformRight - (x - radius);
+                double overlapTop = y + radius - platformTop;
+                double overlapBottom = platformBottom - (y - radius);
 
                 // Find smallest overlap
                 double overlapX = (overlapLeft < overlapRight) ? -overlapLeft : overlapRight;
@@ -1132,24 +1132,40 @@ public:
         
         for (const auto& platform : platforms) {
             SDL_Rect collisionRect = platform.rect;
-
-            // Normal collision handling for all platforms (in world space)
-            double characterLeft = worldX - radius;
-            double characterRight = worldX + radius;
-            double characterTop = y - radius;
-            double characterBottom = y + radius;
-
+            
+            // Get platform corners and edges
             double platformLeft = collisionRect.x;
             double platformRight = collisionRect.x + collisionRect.w;
             double platformTop = collisionRect.y;
             double platformBottom = collisionRect.y + collisionRect.h;
+            
+            // Find the closest point on the platform to the circle center
+            double closestX = std::max(platformLeft, std::min(worldX, platformRight));
+            double closestY = std::max(platformTop, std::min(y, platformBottom));
+            
+            // Calculate distance between closest point and circle center
+            double distanceX = worldX - closestX;
+            double distanceY = y - closestY;
+            double distanceSquared = distanceX * distanceX + distanceY * distanceY;
+            
+            // Check if circle collides with platform
+            if (distanceSquared < radius * radius) {
+                // Check if this is a spike platform
+                if (platform.isSpike) {
+                    // Hit a spike, reset player position and go to first screen
+                    getCurrentScreenIndex() = 0;  // Reset to first screen
+                    getCameraOffsetX() = 0;       // Reset camera offset
+                    resetPosition();              // Reset player position
+                    return; // Exit collision check after respawning
+                }
+                
+                // Determine finish line based on level (handled in main.cpp)
 
-            // Check if there is any overlap
-            if (characterRight > platformLeft && characterLeft < platformRight &&
-                characterBottom > platformTop && characterTop < platformBottom) {
-
-                // Note: Finish line detection is now handled directly in main.cpp
-                // to better control level-specific behavior
+                // For character collisions, we need to convert character bounds to world space
+                double characterLeft = worldX - radius;
+                double characterRight = worldX + radius;
+                double characterTop = y - radius;
+                double characterBottom = y + radius;
 
                 // Calculate overlap amounts
                 double overlapLeft = characterRight - platformLeft;
@@ -1205,9 +1221,19 @@ public:
     }
 
     void resetPosition() {
-        // Reset position to initial position
-        x = 300;  // Initial x position
-        y = 100;  // Initial y position
+        // Reset position to initial position based on level
+        extern int selectedLevel;  // Properly declare the external variable
+        
+        if (selectedLevel == 3) {
+            // Level 3 specific starting position - on top of first round platform
+            x = 250;  // Center of the first round platform (200 + 100/2)
+            y = 450;  // Just above the platform at y=500
+        } else {
+            // Default starting position for other levels
+            x = 300;  // Initial x position
+            y = 100;  // Initial y position
+        }
+        
         vx = 0;
         vy = 0;
 

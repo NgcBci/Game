@@ -89,7 +89,97 @@ public:
 
     static std::vector<Platform> getLevel3Platforms(SDL_Renderer* renderer) {
         std::vector<Platform> platforms;
-        // Add level 3 platforms here
+        
+        // Load textures with correct paths
+        SDL_Texture* roundPlatformTexture = IMG_LoadTexture(renderer, "F:\\Game\\graphic\\roundpf-Photoroom.png");
+        SDL_Texture* pollTexture = IMG_LoadTexture(renderer, "F:\\Game\\graphic\\poll.png");
+        SDL_Texture* spikesTexture = IMG_LoadTexture(renderer, "F:\\Game\\graphic\\spikes-Photoroom.png");
+        SDL_Texture* finishTexture = IMG_LoadTexture(renderer, "F:\\Game\\graphic\\finish.png");
+
+        // Create platforms for Level 3 - using 3 screens like Level 2
+        // SCREEN 1
+        
+        // Starting round platform - positioned to match character spawn at (200, 450)
+        SDL_Rect rect = {200, 500, 100, 100};
+        platforms.push_back(Platform(rect, roundPlatformTexture));
+        
+        // Poll platforms with more spacing - SIGNIFICANTLY INCREASED spacing
+        rect = {450, 200, 50, 200};  // Moved further left
+        platforms.push_back(Platform(rect, pollTexture));
+        
+        rect = {950, 350, 50, 200};  // Moved further right - more distance between polls
+        platforms.push_back(Platform(rect, pollTexture));
+        
+        // Add spikes on the ground - LOWERED position and moved
+        rect = {700, 600, 100, 50};  // Kept in the middle but lowered
+        platforms.push_back(Platform(rect, spikesTexture, true));
+        
+        // Screen transition platform (end of screen 1)
+        rect = {SCREEN_WIDTH - 200, 450, 100, 100};
+        platforms.push_back(Platform(rect, roundPlatformTexture));
+
+        // SCREEN 2
+        
+        // Duplicated platform at start of screen 2
+        rect = {SCREEN_WIDTH + 150, 450, 100, 100};
+        platforms.push_back(Platform(rect, roundPlatformTexture));
+        
+        // More polls and round platforms with MUCH GREATER spacing
+        rect = {SCREEN_WIDTH + 400, 250, 50, 200};  // First poll
+        platforms.push_back(Platform(rect, pollTexture));
+        
+        rect = {SCREEN_WIDTH + 800, 200, 100, 100};  // Middle round platform - moved further right
+        platforms.push_back(Platform(rect, roundPlatformTexture));
+        
+        rect = {SCREEN_WIDTH + 1150, 300, 50, 200};  // Last poll - moved further right
+        platforms.push_back(Platform(rect, pollTexture));
+        
+        // More ground spikes - wider spacing
+        rect = {SCREEN_WIDTH + 550, 600, 100, 50};  // First spike
+        platforms.push_back(Platform(rect, spikesTexture, true));
+        
+        rect = {SCREEN_WIDTH + 950, 600, 100, 50};  // Second spike - moved further away
+        platforms.push_back(Platform(rect, spikesTexture, true));
+        
+        // Screen transition platform (end of screen 2)
+        rect = {SCREEN_WIDTH * 2 - 200, 450, 100, 100};
+        platforms.push_back(Platform(rect, roundPlatformTexture));
+
+        // SCREEN 3
+        
+        // Duplicated platform at start of screen 3
+        rect = {SCREEN_WIDTH * 2 + 150, 450, 100, 100};
+        platforms.push_back(Platform(rect, roundPlatformTexture));
+        
+        // Final section with mix of all platform types - MUCH WIDER spacing
+        rect = {SCREEN_WIDTH * 2 + 400, 250, 100, 100};  // First round platform
+        platforms.push_back(Platform(rect, roundPlatformTexture));
+        
+        rect = {SCREEN_WIDTH * 2 + 650, 200, 50, 200};  // First poll - more distant from previous
+        platforms.push_back(Platform(rect, pollTexture));
+        
+        rect = {SCREEN_WIDTH * 2 + 1000, 300, 100, 100};  // Middle round platform - moved further apart
+        platforms.push_back(Platform(rect, roundPlatformTexture));
+        
+        rect = {SCREEN_WIDTH * 2 + 1250, 250, 50, 200};  // Last poll - greater distance
+        platforms.push_back(Platform(rect, pollTexture));
+        
+        // More ground spikes near finish with much greater spacing
+        rect = {SCREEN_WIDTH * 2 + 750, 600, 100, 50};  // First spike
+        platforms.push_back(Platform(rect, spikesTexture, true));
+        
+        rect = {SCREEN_WIDTH * 2 + 1150, 600, 100, 50};  // Second spike - more separation
+        platforms.push_back(Platform(rect, spikesTexture, true));
+
+        // Finish line at the end of the sliding window
+        SDL_Rect finishRect = {
+            SCREEN_WIDTH * 3 - 300,  // X position - at end of screen 3
+            350,                     // Y position - same as Level 2
+            200,                     // Width
+            100                      // Height
+        };
+        platforms.push_back(Platform(finishRect, finishTexture));
+        
         return platforms;
     }
 
