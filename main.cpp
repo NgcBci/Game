@@ -279,6 +279,14 @@ int SDL_main(int argc, char* argv[]) {
                                 finishLineEnabled = true;
                             }
                             break;
+                        case SDL_SCANCODE_Q:  // Return to menu when 'aced' screen is shown
+                            if (player.showingCongratulations) {
+                                currentState = MENU;
+                                player.showingCongratulations = false;  // Reset the congratulations flag
+                                // Reset finish line for next play
+                                finishLineEnabled = true;
+                            }
+                            break;
                     }
                 }
                 else if (event.type == SDL_KEYUP) {
@@ -678,6 +686,62 @@ int SDL_main(int argc, char* argv[]) {
                 SDL_RenderCopy(core.renderer, platform.texture, NULL, &platformRect);
             }
 
+            // Special handling for Level 5 interactive platform
+            if (selectedLevel == 5) {
+                // Count how many buttons are activated
+                int activatedButtonCount = 0;
+                int buttonIndex1 = -1;
+                int buttonIndex2 = -1;
+                int pollIndex = -1;
+                
+                // Find the interactive platforms and the poll platform
+                for (int i = 0; i < core.platforms.size(); i++) {
+                    const auto& platform = core.platforms[i];
+                    if (platform.isInteractive) {
+                        if (buttonIndex1 == -1) {
+                            buttonIndex1 = i;
+                        } else {
+                            buttonIndex2 = i;
+                        }
+                        
+                        if (platform.activated) {
+                            activatedButtonCount++;
+                        }
+                    }
+                    
+                    // Find the poll platform (assuming it's the one closest to SCREEN_WIDTH - 350)
+                    if (abs(platform.rect.x - (SCREEN_WIDTH - 350)) < 10 && platform.rect.h == SCREEN_HEIGHT) {
+                        pollIndex = i;
+                    }
+                }
+                
+                // Check if both buttons have been activated
+                if (activatedButtonCount == 2 && pollIndex != -1) {
+                    // Move the poll off-screen to make it "disappear"
+                    core.platforms[pollIndex].rect.x = -1000;
+                }
+                
+                // Handle activation of individual buttons
+                for (auto& platform : core.platforms) {
+                    if (platform.isInteractive && !platform.activated) {
+                        // Check if player is touching the interactive platform
+                        SDL_Rect platformRect = platform.rect;
+                        
+                        // Check for any overlap with player
+                        if (player.x + player.radius > platformRect.x &&
+                            player.x - player.radius < platformRect.x + platformRect.w &&
+                            player.y + player.radius > platformRect.y &&
+                            player.y - player.radius < platformRect.y + platformRect.h) {
+                            
+                            // Activate the platform (swap textures) immediately
+                            platform.activate();
+                            // Play a sound for feedback
+                            backgroundMusic.playApplauseSound();
+                        }
+                    }
+                }
+            }
+
             // Render the spike wall for Level 3
             if (selectedLevel == 3 && isSpikewallActive && spikeWall) {
                 SDL_Rect adjustedSpikeRect = spikeWall->rect;
@@ -692,9 +756,10 @@ int SDL_main(int argc, char* argv[]) {
             bool isFalling = !player.leftHand.isGrabbingObject && !player.rightHand.isGrabbingObject && player.vy > 0;
             backgroundMusic.playFallSound(isFalling);
 
-            // If character has reached finish line, render congratulations screen and play applause
+            // If character has reached finish line, render "aced" screen and play applause
             if (player.showingCongratulations) {
-                core.renderCongratulations();
+                // Use the "aced" image instead of the regular congratulations screen
+                core.renderAced();
 
                 // Only play applause once - moved to finish line detection
 
