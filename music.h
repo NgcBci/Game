@@ -12,49 +12,32 @@ private:
     bool hasPlayedApplause;
     Uint32 respawnTime;
     static const Uint32 RESPAWN_COOLDOWN = 1000;  // 1 second cooldown after respawn
+    int musicVolume;  // Store current music volume (0-128)
+    int sfxVolume;    // Store current SFX volume (0-128)
 
 public:
     Music() : gMusic(nullptr), grabSound(nullptr), fallSound(nullptr), applauseSound(nullptr),
-              isGrabSoundPlaying(false), isFalling(false), hasPlayedApplause(false), respawnTime(0) {}
+              isGrabSoundPlaying(false), isFalling(false), hasPlayedApplause(false), respawnTime(0),
+              musicVolume(MIX_MAX_VOLUME), sfxVolume(MIX_MAX_VOLUME) {}
 
     Mix_Music* loadMusic(const char* path) {
         gMusic = Mix_LoadMUS(path);
-        if (gMusic == nullptr) {
-            SDL_LogMessage(SDL_LOG_CATEGORY_APPLICATION,
-                          SDL_LOG_PRIORITY_ERROR,
-                          "Could not load music! SDL_mixer Error: %s", Mix_GetError());
-        }
         return gMusic;
     }
 
     void loadSound(const char* path) {
         grabSound = Mix_LoadWAV(path);
         if (grabSound != nullptr) {
-            // Set the length of the sound to 1 second (assuming 44.1kHz sample rate)
-            grabSound->alen = 44100 * 2 * 2;  // 44100 samples/sec * 2 channels * 2 bytes/sample
-        } else {
-            SDL_LogMessage(SDL_LOG_CATEGORY_APPLICATION,
-                          SDL_LOG_PRIORITY_ERROR,
-                          "Could not load sound effect! SDL_mixer Error: %s", Mix_GetError());
+            grabSound->alen = 44100 * 2 * 2;
         }
     }
 
     void loadFallSound(const char* path) {
         fallSound = Mix_LoadWAV(path);
-        if (fallSound == nullptr) {
-            SDL_LogMessage(SDL_LOG_CATEGORY_APPLICATION,
-                          SDL_LOG_PRIORITY_ERROR,
-                          "Could not load fall sound effect! SDL_mixer Error: %s", Mix_GetError());
-        }
     }
 
     void loadApplauseSound(const char* path) {
         applauseSound = Mix_LoadWAV(path);
-        if (applauseSound == nullptr) {
-            SDL_LogMessage(SDL_LOG_CATEGORY_APPLICATION,
-                          SDL_LOG_PRIORITY_ERROR,
-                          "Could not load applause sound effect! SDL_mixer Error: %s", Mix_GetError());
-        }
     }
 
     void play() {
@@ -62,6 +45,7 @@ public:
 
         if (Mix_PlayingMusic() == 0) {
             Mix_PlayMusic(gMusic, -1);
+            setMusicVolume(musicVolume);
         }
         else if (Mix_PausedMusic() == 1) {
             Mix_ResumeMusic();
@@ -70,13 +54,13 @@ public:
 
     void playGrabSound() {
         if (grabSound != nullptr && !isGrabSoundPlaying) {
-            Mix_PlayChannel(-1, grabSound, 0);
+            int channel = Mix_PlayChannel(-1, grabSound, 0);
+            Mix_Volume(channel, sfxVolume);
             isGrabSoundPlaying = true;
-            // Reset the flag after the sound duration (1 second)
             SDL_AddTimer(1000, [](Uint32 interval, void* param) -> Uint32 {
                 Music* music = static_cast<Music*>(param);
                 music->isGrabSoundPlaying = false;
-                return 0;  // Don't repeat the timer
+                return 0;
             }, this);
         }
     }
@@ -87,12 +71,11 @@ public:
             bool isInRespawnCooldown = (currentTime - respawnTime) < RESPAWN_COOLDOWN;
 
             if (isCurrentlyFalling && !isFalling && !isInRespawnCooldown) {
-                // Start falling
-                Mix_PlayChannel(-1, fallSound, 0);
+                int channel = Mix_PlayChannel(-1, fallSound, 0);
+                Mix_Volume(channel, sfxVolume);
                 isFalling = true;
             }
             else if (!isCurrentlyFalling) {
-                // Stop falling
                 isFalling = false;
             }
         }
@@ -104,7 +87,8 @@ public:
 
     void playApplauseSound() {
         if (applauseSound != nullptr && !hasPlayedApplause) {
-            Mix_PlayChannel(-1, applauseSound, 0);
+            int channel = Mix_PlayChannel(-1, applauseSound, 0);
+            Mix_Volume(channel, sfxVolume);
             hasPlayedApplause = true;
         }
     }
@@ -121,6 +105,28 @@ public:
 
     void stop() {
         Mix_HaltMusic();
+    }
+
+    void setMusicVolume(int volume) {
+        musicVolume = volume;
+        Mix_VolumeMusic(musicVolume);
+    }
+
+    void setSfxVolume(int volume) {
+        sfxVolume = volume;
+        for (int i = 0; i < 8; i++) {
+            if (Mix_Playing(i)) {
+                Mix_Volume(i, sfxVolume);
+            }
+        }
+    }
+
+    int getMusicVolume() const {
+        return musicVolume;
+    }
+
+    int getSfxVolume() const {
+        return sfxVolume;
     }
 
     ~Music() {

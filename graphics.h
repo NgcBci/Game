@@ -6,6 +6,7 @@
 #include <vector>
 #include <cmath>
 #include <cstdlib> // For rand()
+#include <cstring> // For strstr()
 
 using std::vector;
 
@@ -42,18 +43,6 @@ struct GameObject {
     }
 
     void render(SDL_Renderer* renderer) const {
-        if (!texture) {
-            // Draw a colored rectangle as fallback
-            SDL_SetRenderDrawColor(renderer, 255, 255, 255, 255);  // Red color
-            SDL_Rect destRect = {
-                static_cast<int>(x),
-                static_cast<int>(y),
-                static_cast<int>(width),
-                static_cast<int>(height)
-            };
-            SDL_RenderFillRect(renderer, &destRect);
-            return;
-        }
         SDL_Rect destRect = {
             static_cast<int>(x),
             static_cast<int>(y),
@@ -76,21 +65,21 @@ struct Platform {
     SDL_Texture* texture;
     double visualHeight;  // Actual visual height of the platform texture
     bool isSpike;        // New flag to identify if this platform is a spike
-    
+
     // Moving platform properties
     bool isMoving;
     float startX, endX;
     float speed;
     bool movingForward;
     bool movesVertically;  // New property to indicate vertical movement
-    
+
     // Interactive platform properties
     bool isInteractive;
     SDL_Texture* alternateTexture;
     bool activated;
 
-    Platform(SDL_Rect r, SDL_Texture* t, bool spike = false) 
-        : rect(r), texture(t), isSpike(spike), isMoving(false), 
+    Platform(SDL_Rect r, SDL_Texture* t, bool spike = false)
+        : rect(r), texture(t), isSpike(spike), isMoving(false),
           startX(0), endX(0), speed(0), movingForward(true), movesVertically(false),
           isInteractive(false), alternateTexture(nullptr), activated(false) {
         // Get the actual texture dimensions
@@ -98,7 +87,7 @@ struct Platform {
         SDL_QueryTexture(t, NULL, NULL, &w, &h);
         visualHeight = h;
     }
-    
+
     // Constructor for moving platforms
     Platform(SDL_Rect r, SDL_Texture* t, float startPos, float endPos, float moveSpeed, bool spike = false)
         : rect(r), texture(t), isSpike(spike), isMoving(true),
@@ -110,7 +99,7 @@ struct Platform {
         visualHeight = h;
         rect.x = static_cast<int>(startX); // Initialize position
     }
-    
+
     // Constructor for interactive platforms
     Platform(SDL_Rect r, SDL_Texture* t, SDL_Texture* altTexture)
         : rect(r), texture(t), isSpike(false), isMoving(false),
@@ -121,10 +110,10 @@ struct Platform {
         SDL_QueryTexture(t, NULL, NULL, &w, &h);
         visualHeight = h;
     }
-    
+
     void update(float deltaTime = 1.0f) {
         if (!isMoving) return;
-        
+
         if (movesVertically) {
             // Handle vertical movement (startX and endX are used as startY and endY)
             if (movingForward) {
@@ -157,7 +146,7 @@ struct Platform {
             }
         }
     }
-    
+
     // Activate the interactive platform
     void activate() {
         if (isInteractive && !activated) {
@@ -178,15 +167,15 @@ struct MovingObject {
     float velocityY;
     float startX;
     float startY;
-    
-    MovingObject(SDL_Rect r, SDL_Texture* t, float vx = 0, float vy = 0) : 
+
+    MovingObject(SDL_Rect r, SDL_Texture* t, float vx = 0, float vy = 0) :
         rect(r), texture(t), velocityX(vx), velocityY(vy), startX(r.x), startY(r.y) {}
-    
+
     void update() {
         rect.x += velocityX;
         rect.y += velocityY;
     }
-    
+
     void reset() {
         rect.x = startX;
         rect.y = startY;
@@ -203,7 +192,7 @@ struct Graphics {
     SDL_Texture* acedTexture;   // Add aced texture
     std::vector<Platform> platforms;
 
-    Graphics() : window(nullptr), renderer(nullptr), characterTexture(nullptr), 
+    Graphics() : window(nullptr), renderer(nullptr), characterTexture(nullptr),
                 handTexture(nullptr), congratulationsTexture(nullptr), guideTexture(nullptr),
                 acedTexture(nullptr) {}
 
@@ -255,7 +244,7 @@ struct Graphics {
                           SDL_LOG_PRIORITY_ERROR,
                           "Could not load guide image! SDL_Error: %s", SDL_GetError());
         }
-        
+
         // Load aced image
         acedTexture = IMG_LoadTexture(renderer, "F:\\Game\\graphic\\aced-Photoroom.png");
         if (acedTexture == nullptr) {
@@ -327,19 +316,23 @@ struct Graphics {
 
     void renderAced() {
         if (!acedTexture) return;
-        
+
         // Get texture dimensions
         int texWidth, texHeight;
         SDL_QueryTexture(acedTexture, NULL, NULL, &texWidth, &texHeight);
-        
+
+        // Calculate smaller size (70% of original)
+        int newWidth = static_cast<int>(texWidth * 0.7);
+        int newHeight = static_cast<int>(texHeight * 0.7);
+
         // Calculate position to center on screen
         SDL_Rect destRect = {
-            (SCREEN_WIDTH - texWidth) / 2,
-            (SCREEN_HEIGHT - texHeight) / 2,
-            texWidth,
-            texHeight
+            (SCREEN_WIDTH - newWidth) / 2,
+            (SCREEN_HEIGHT - newHeight) / 2,
+            newWidth,
+            newHeight
         };
-        
+
         // Render the texture
         SDL_RenderCopy(renderer, acedTexture, NULL, &destRect);
     }
@@ -373,7 +366,7 @@ struct Graphics {
             SDL_DestroyTexture(acedTexture);
             acedTexture = nullptr;
         }
-        
+
         // Cleanup platforms
         for (auto& platform : platforms) {
             if (platform.texture) {
@@ -393,7 +386,9 @@ public:
     SDL_Texture* handTexture;
     SDL_Texture* grabTexture;  // New texture for grabbing state
     bool isLeftHand;
-    
+    // Add color property for the rope
+    SDL_Color ropeColor;
+
     // Keep platform tracking for debugging purposes
     int grabbedPlatformIndex;  // Index of the grabbed platform in platforms vector
 
@@ -401,6 +396,9 @@ public:
         : isGrabbingObject(false), isLeftHand(isLeft), grabbedPlatformIndex(-1) {
         maxLength = sqrt(pow(x2 - x1, 2) + pow(y2 - y1, 2));  // Calculate maximum length
         currentLength = maxLength;
+
+        // Default rope color is red
+        ropeColor = {255, 0, 0, 255};  // Red color (R,G,B,A)
 
         // Load release hand texture based on hand type
         const char* releasePath = isLeft ? "F:\\Game\\graphic\\lefthandrelease.png" : "F:\\Game\\graphic\\righthandrelease.png";
@@ -457,7 +455,9 @@ public:
     }
 
     void render(SDL_Renderer* renderer) {
-        SDL_SetRenderDrawColor(renderer, 255, 0, 0, 255);
+        // Use the rope color for drawing the rope
+        SDL_SetRenderDrawColor(renderer, ropeColor.r, ropeColor.g, ropeColor.b, ropeColor.a);
+
         for (size_t i = 0; i < parti.size() - 1; i++) {
             // Draw multiple lines to create a thicker rope
             for (int offset = -2; offset <= 2; offset++) {
@@ -544,7 +544,7 @@ public:
         parti.back().yCurrent = graby;
         parti.back().checkmovement = true;
         isGrabbingObject = true;
-        
+
         // Reset platform tracking when doing a standard grab
         grabbedPlatformIndex = -1;
     }
@@ -562,7 +562,7 @@ public:
         for (auto& particle : parti) {
             // Skip fixed particles (first and possibly last particle)
             if (particle.checkmovement) continue;
-            
+
             for (const auto& platform : platforms) {
                 // Get current velocity
                 double velX = particle.xCurrent - particle.xPrevious;
@@ -720,12 +720,114 @@ public:
     double swingEnergy = 0;
     double facingDirection = 1.0; // 1.0 for right, -1.0 for left
 
+    // Add a function to set the character texture at runtime
+    void setTexture(SDL_Renderer* renderer, const char* texturePath) {
+        // Free old texture if it exists
+        if (texture) {
+            SDL_DestroyTexture(texture);
+            texture = nullptr;
+        }
+
+        // Try to load the new image
+        SDL_Surface* originalSurface = IMG_Load(texturePath);
+        if (!originalSurface) {
+            return;
+        }
+
+        // Create a new surface at the desired size (2*radius x 2*radius)
+        SDL_Surface* scaledSurface = SDL_CreateRGBSurface(0, radius * 2, radius * 2, 32,
+            0x00FF0000, 0x0000FF00, 0x000000FF, 0xFF000000);
+
+        if (!scaledSurface) {
+            SDL_FreeSurface(originalSurface);
+            return;
+        }
+
+        // Scale the image to match the collision size
+        SDL_BlitScaled(originalSurface, NULL, scaledSurface, NULL);
+
+        // Create texture from the scaled surface
+        texture = SDL_CreateTextureFromSurface(renderer, scaledSurface);
+
+        // Clean up surfaces
+        SDL_FreeSurface(originalSurface);
+        SDL_FreeSurface(scaledSurface);
+
+        // Free existing hand textures first to prevent memory leaks
+        if (leftHand.handTexture) {
+            SDL_DestroyTexture(leftHand.handTexture);
+            leftHand.handTexture = nullptr;
+        }
+        if (leftHand.grabTexture) {
+            SDL_DestroyTexture(leftHand.grabTexture);
+            leftHand.grabTexture = nullptr;
+        }
+        if (rightHand.handTexture) {
+            SDL_DestroyTexture(rightHand.handTexture);
+            rightHand.handTexture = nullptr;
+        }
+        if (rightHand.grabTexture) {
+            SDL_DestroyTexture(rightHand.grabTexture);
+            rightHand.grabTexture = nullptr;
+        }
+
+        // Check if this is the mint character
+        if (strstr(texturePath, "mintchar") != nullptr) {
+            // Load mint-specific hand textures
+            leftHand.handTexture = IMG_LoadTexture(renderer, "F:\\Game\\graphic\\mintleftrelease-Photoroom - Copy.png");
+            leftHand.grabTexture = IMG_LoadTexture(renderer, "F:\\Game\\graphic\\mintrightgrab-Photoroom.png");
+            rightHand.handTexture = IMG_LoadTexture(renderer, "F:\\Game\\graphic\\mintleftrelease-Photoroom.png");
+            rightHand.grabTexture = IMG_LoadTexture(renderer, "F:\\Game\\graphic\\mintrightgrab-Photoroom - Copy.png");
+
+            // Set mint color for ropes (a light mint/teal color)
+            leftHand.ropeColor = {0, 200, 150, 255};  // Mint/teal color for mint character
+            rightHand.ropeColor = {0, 200, 150, 255};
+        }
+        // Check if this is the black character
+        else if (strstr(texturePath, "blackchar") != nullptr) {
+            // Load black character-specific hand textures
+            rightHand.handTexture = IMG_LoadTexture(renderer, "F:\\Game\\graphic\\blackreleaseleft-Photoroom.png");
+            leftHand.handTexture = IMG_LoadTexture(renderer, "F:\\Game\\graphic\\blackreleaseleft-Photoroom - Copy.png");
+            rightHand.grabTexture = IMG_LoadTexture(renderer, "F:\\Game\\graphic\\blacklefthand-Photoroom - Copy - Copy.png");
+            leftHand.grabTexture = IMG_LoadTexture(renderer, "F:\\Game\\graphic\\blacklefthand-Photoroom - Copy.png");
+
+            // Set black color for ropes
+            SDL_Color blackColor = {30, 30, 30, 255};  // Dark black color with a bit of visibility
+            leftHand.ropeColor = blackColor;
+            rightHand.ropeColor = blackColor;
+        }
+        // Check if this is the Sabrina character
+        else if (strstr(texturePath, "3735783d") != nullptr) {
+            // Load Sabrina-specific hand textures
+            rightHand.handTexture = IMG_LoadTexture(renderer, "F:\\Game\\graphic\\sabrinaleftrelease-removebg-preview.png");
+            leftHand.handTexture = IMG_LoadTexture(renderer, "F:\\Game\\graphic\\sabrinaleftrelease-removebg-preview - Copy.png");
+            leftHand.grabTexture = IMG_LoadTexture(renderer, "F:\\Game\\graphic\\sabrinaleftgrab-removebg-preview - Copy.png");
+            rightHand.grabTexture = IMG_LoadTexture(renderer, "F:\\Game\\graphic\\sabrinaleftgrab-removebg-preview.png");
+
+            // Set muted yellow color for ropes
+            SDL_Color mutedYellow = {220, 180, 50, 255};  // Muted yellow color
+            leftHand.ropeColor = mutedYellow;
+            rightHand.ropeColor = mutedYellow;
+        }
+        else {
+            // Load default hand textures for other characters
+            leftHand.handTexture = IMG_LoadTexture(renderer, "F:\\Game\\graphic\\lefthandrelease.png");
+            leftHand.grabTexture = IMG_LoadTexture(renderer, "F:\\Game\\graphic\\grableft.png");
+            rightHand.handTexture = IMG_LoadTexture(renderer, "F:\\Game\\graphic\\righthandrelease.png");
+            rightHand.grabTexture = IMG_LoadTexture(renderer, "F:\\Game\\graphic\\grabright.png");
+
+            // Reset to default red color for ropes
+            leftHand.ropeColor = {255, 0, 0, 255};  // Red color
+            rightHand.ropeColor = {255, 0, 0, 255};
+        }
+    }
+
     // External variables from main.cpp that we need to modify
     static int& getCurrentScreenIndex() {
         extern int currentScreenIndex;
         return currentScreenIndex;
     }
-    
+
     static double& getCameraOffsetX() {
         extern double cameraOffsetX;
         return cameraOffsetX;
@@ -965,7 +1067,7 @@ public:
         const Uint8* keystate = SDL_GetKeyboardState(NULL);
 
         // Remove hardcoded finish line detection - this is now handled in main.cpp
-        
+
         // If showing congratulations, only check for C or Q keys
         if (showingCongratulations) {
             if (keystate[SDL_SCANCODE_C]) {
@@ -1025,7 +1127,7 @@ public:
                 leftHand.parti[i].xPrevious = leftHand.parti[i].xCurrent;
                 leftHand.parti[i].yPrevious = leftHand.parti[i].yCurrent;
             }
-            
+
             for (size_t i = 0; i < rightHand.parti.size(); i++) {
                 double t = static_cast<double>(i) / (rightHand.parti.size() - 1);
                 rightHand.parti[i].xCurrent = x + radius + (35 * t);  // Spread particles right
@@ -1049,10 +1151,10 @@ public:
         // Update both hands
         leftHand.step();
         rightHand.step();
-        
+
         // Apply swing forces before gravity
         applySwingForces(keystate);
-        
+
         // Always apply gravity, but less when swinging to preserve momentum
         if (leftHand.isGrabbingObject || rightHand.isGrabbingObject) {
             // Reduced gravity when holding on to something
@@ -1129,7 +1231,7 @@ public:
                     leftHand.parti.back().yPrevious = handY;
                     leftHand.parti.back().checkmovement = true;
                     leftHand.isGrabbingObject = true;
-                    
+
                     // If it's a moving platform, store position information
                     if (platform.isMoving) {
                         leftHand.grabbedPlatformIndex = -1;  // We'll handle movement directly in main.cpp
@@ -1148,7 +1250,7 @@ public:
                     rightHand.parti.back().yPrevious = handY;
                     rightHand.parti.back().checkmovement = true;
                     rightHand.isGrabbingObject = true;
-                    
+
                     // If it's a moving platform, store position information
                     if (platform.isMoving) {
                         rightHand.grabbedPlatformIndex = -1;  // We'll handle movement directly in main.cpp
@@ -1182,10 +1284,10 @@ public:
         for (const auto& platform : platforms) {
             if (handX >= platform.rect.x && handX <= platform.rect.x + platform.rect.w &&
                 handY >= platform.rect.y && handY <= platform.rect.y + platform.rect.h) {
-                
+
                 // Adjust grab position back to screen space
                 double screenSpaceHandX = handX - cameraOffsetX;
-                
+
                 if (isLeft) {
                     // Set fixed grab point exactly at current position
                     leftHand.parti.back().xCurrent = screenSpaceHandX;
@@ -1194,7 +1296,7 @@ public:
                     leftHand.parti.back().yPrevious = handY;
                     leftHand.parti.back().checkmovement = true;
                     leftHand.isGrabbingObject = true;
-                    
+
                     // If it's a moving platform, store position information
                     if (platform.isMoving) {
                         leftHand.grabbedPlatformIndex = -1;  // We'll handle movement directly in main.cpp
@@ -1213,7 +1315,7 @@ public:
                     rightHand.parti.back().yPrevious = handY;
                     rightHand.parti.back().checkmovement = true;
                     rightHand.isGrabbingObject = true;
-                    
+
                     // If it's a moving platform, store position information
                     if (platform.isMoving) {
                         rightHand.grabbedPlatformIndex = -1;  // We'll handle movement directly in main.cpp
@@ -1303,16 +1405,16 @@ public:
             double platformRight = collisionRect.x + collisionRect.w;
             double platformTop = collisionRect.y;
             double platformBottom = collisionRect.y + collisionRect.h;
-            
+
             // Find the closest point on the platform to the circle center
             double closestX = std::max(platformLeft, std::min(x, platformRight));
             double closestY = std::max(platformTop, std::min(y, platformBottom));
-            
+
             // Calculate distance between closest point and circle center
             double distanceX = x - closestX;
             double distanceY = y - closestY;
             double distanceSquared = distanceX * distanceX + distanceY * distanceY;
-            
+
             // Check if circle collides with platform
             if (distanceSquared < radius * radius) {
                 // Check if this is a spike platform
@@ -1363,25 +1465,25 @@ public:
     void handlecollisionWithCamera(const std::vector<Platform>& platforms, double cameraOffsetX, int screenIndex = 0) {
         // Apply camera offset to character position for world-space collision detection
         double worldX = x + cameraOffsetX;
-        
+
         for (const auto& platform : platforms) {
             SDL_Rect collisionRect = platform.rect;
-            
+
             // Get platform corners and edges
             double platformLeft = collisionRect.x;
             double platformRight = collisionRect.x + collisionRect.w;
             double platformTop = collisionRect.y;
             double platformBottom = collisionRect.y + collisionRect.h;
-            
+
             // Find the closest point on the platform to the circle center
             double closestX = std::max(platformLeft, std::min(worldX, platformRight));
             double closestY = std::max(platformTop, std::min(y, platformBottom));
-            
+
             // Calculate distance between closest point and circle center
             double distanceX = worldX - closestX;
             double distanceY = y - closestY;
             double distanceSquared = distanceX * distanceX + distanceY * distanceY;
-            
+
             // Check if circle collides with platform
             if (distanceSquared < radius * radius) {
                 // Check if this is a spike platform
@@ -1392,7 +1494,7 @@ public:
                     resetPosition();              // Reset player position
                     return; // Exit collision check after respawning
                 }
-                
+
                 // Determine finish line based on level (handled in main.cpp)
 
                 // For character collisions, we need to convert character bounds to world space
@@ -1434,232 +1536,7 @@ public:
         for (auto& platform : adjustedPlatforms) {
             platform.rect.x -= static_cast<int>(cameraOffsetX);
         }
-        
-        leftHand.handlecollision(adjustedPlatforms);
-        rightHand.handlecollision(adjustedPlatforms);
-    }
 
-    void render(SDL_Renderer* renderer) {
-        // First render the character
-        SDL_Rect destrec = {
-            static_cast<int>(x-radius),
-            static_cast<int>(y - radius),
-            static_cast<int>(radius * 2),
-            static_cast<int>(radius * 2),
-        };
-        SDL_RenderCopy(renderer, texture, NULL, &destrec);
-
-        // Then render the ropes on top
-        leftHand.render(renderer);
-        rightHand.render(renderer);
-    }
-
-    void resetPosition() {
-        x = 300;  // Initial x position
-        y = 100;  // Initial y position
-        vx = 0;
-        vy = 0;
-
-        // Reset hands
-        leftHand.release();
-        rightHand.release();
-
-        // Reset hand positions relative to character position
-        for (size_t i = 0; i < leftHand.parti.size(); i++) {
-            double t = static_cast<double>(i) / (leftHand.parti.size() - 1);
-            leftHand.parti[i].xCurrent = x - radius - (35 * t);  // Spread particles left
-            leftHand.parti[i].yCurrent = y;
-            leftHand.parti[i].xPrevious = leftHand.parti[i].xCurrent;
-            leftHand.parti[i].yPrevious = leftHand.parti[i].yCurrent;
-        }
-
-        for (size_t i = 0; i < rightHand.parti.size(); i++) {
-            double t = static_cast<double>(i) / (rightHand.parti.size() - 1);
-            rightHand.parti[i].xCurrent = x + radius + (35 * t);  // Spread particles right
-            rightHand.parti[i].yCurrent = y;
-            rightHand.parti[i].xPrevious = rightHand.parti[i].xCurrent;
-            rightHand.parti[i].yPrevious = rightHand.parti[i].yCurrent;
-        }
-
-        // Reset swing tracking
-        maxSwingSpeed = 0;
-        swingEnergy = 0;
-    }
-
-private:
-    // Movement and physics constants
-    const double JUMP_BOOST = 1.4;     // Boost multiplier when releasing
-    const double FORWARD_TOSS = 50.0;  // Forward momentum on release
-    const double UPWARD_BOOST = 40.0;  // Upward impulse on release
-};
-
-void renderPlatform(SDL_Renderer* renderer, SDL_Texture* texture, SDL_Rect rect) {
-    // Simple direct rendering without jitter or wobble effects
-    SDL_RenderCopy(renderer, texture, NULL, &rect);
-}
-
-#endif
-
-        }
-    }
-
-    bool checkCollision(const SDL_Rect& rect, double& overlapX, double& overlapY) {
-        double left = x - radius;
-        double right = x + radius;
-        double top = y - radius;
-        double bottom = y + radius;
-        if (right > rect.x && left < rect.x + rect.w &&
-            bottom > rect.y && top < rect.y + rect.h) {
-            if (right - rect.x < rect.x + radius - left) overlapX = -(right - rect.x);
-            else overlapX = rect.x + radius - left;
-            if (bottom - rect.y < rect.y + radius - top) overlapY = -(bottom - rect.y);
-            else overlapY = rect.y + radius - top;
-            return true;
-        }
-        return false;
-    }
-
-    void handlecollision(const std::vector<Platform>& platforms, int screenIndex = 0) {
-        for (const auto& platform : platforms) {
-            SDL_Rect collisionRect = platform.rect;
-
-            // Get platform corners and edges
-            double platformLeft = collisionRect.x;
-            double platformRight = collisionRect.x + collisionRect.w;
-            double platformTop = collisionRect.y;
-            double platformBottom = collisionRect.y + collisionRect.h;
-            
-            // Find the closest point on the platform to the circle center
-            double closestX = std::max(platformLeft, std::min(x, platformRight));
-            double closestY = std::max(platformTop, std::min(y, platformBottom));
-            
-            // Calculate distance between closest point and circle center
-            double distanceX = x - closestX;
-            double distanceY = y - closestY;
-            double distanceSquared = distanceX * distanceX + distanceY * distanceY;
-            
-            // Check if circle collides with platform
-            if (distanceSquared < radius * radius) {
-                // Check if this is a spike platform
-                if (platform.isSpike) {
-                    // Hit a spike, reset player position and go to first screen
-                    getCurrentScreenIndex() = 0;  // Reset to first screen
-                    getCameraOffsetX() = 0;       // Reset camera offset
-                    resetPosition();              // Reset player position
-                    return; // Exit collision check after respawning
-                }
-
-                // Determine finish line based on level (handled in main.cpp)
-
-                // Calculate overlap amounts
-                double overlapLeft = x + radius - platformLeft;
-                double overlapRight = platformRight - (x - radius);
-                double overlapTop = y + radius - platformTop;
-                double overlapBottom = platformBottom - (y - radius);
-
-                // Find smallest overlap
-                double overlapX = (overlapLeft < overlapRight) ? -overlapLeft : overlapRight;
-                double overlapY = (overlapTop < overlapBottom) ? -overlapTop : overlapBottom;
-
-                // Resolve collision based on smallest overlap
-                if (abs(overlapX) < abs(overlapY)) {
-                    // Horizontal collision
-                    x += overlapX;
-                    vx = 0;
-                } else {
-                    // Vertical collision
-                    y += overlapY;
-                    if (overlapY < 0) { // If hitting from above
-                        vy = 0;  // Just stop, no bounce
-                        y = platformTop - radius;  // Place exactly on top
-                    } else {  // If hitting from below
-                        vy = 0;  // Stop upward movement
-                    }
-                }
-            }
-        }
-
-        // Also handle rope collisions
-        leftHand.handlecollision(platforms);
-        rightHand.handlecollision(platforms);
-    }
-
-    // New collision handling method that works with camera offset
-    void handlecollisionWithCamera(const std::vector<Platform>& platforms, double cameraOffsetX, int screenIndex = 0) {
-        // Apply camera offset to character position for world-space collision detection
-        double worldX = x + cameraOffsetX;
-        
-        for (const auto& platform : platforms) {
-            SDL_Rect collisionRect = platform.rect;
-            
-            // Get platform corners and edges
-            double platformLeft = collisionRect.x;
-            double platformRight = collisionRect.x + collisionRect.w;
-            double platformTop = collisionRect.y;
-            double platformBottom = collisionRect.y + collisionRect.h;
-            
-            // Find the closest point on the platform to the circle center
-            double closestX = std::max(platformLeft, std::min(worldX, platformRight));
-            double closestY = std::max(platformTop, std::min(y, platformBottom));
-            
-            // Calculate distance between closest point and circle center
-            double distanceX = worldX - closestX;
-            double distanceY = y - closestY;
-            double distanceSquared = distanceX * distanceX + distanceY * distanceY;
-            
-            // Check if circle collides with platform
-            if (distanceSquared < radius * radius) {
-                // Check if this is a spike platform
-                if (platform.isSpike) {
-                    // Hit a spike, reset player position and go to first screen
-                    getCurrentScreenIndex() = 0;  // Reset to first screen
-                    getCameraOffsetX() = 0;       // Reset camera offset
-                    resetPosition();              // Reset player position
-                    return; // Exit collision check after respawning
-                }
-                
-                // Determine finish line based on level (handled in main.cpp)
-
-                // For character collisions, we need to convert character bounds to world space
-                double characterLeft = worldX - radius;
-                double characterRight = worldX + radius;
-                double characterTop = y - radius;
-                double characterBottom = y + radius;
-
-                // Calculate overlap amounts
-                double overlapLeft = characterRight - platformLeft;
-                double overlapRight = platformRight - characterLeft;
-                double overlapTop = characterBottom - platformTop;
-                double overlapBottom = platformBottom - characterTop;
-
-                // Find smallest overlap
-                double overlapX = (overlapLeft < overlapRight) ? -overlapLeft : overlapRight;
-                double overlapY = (overlapTop < overlapBottom) ? -overlapTop : overlapBottom;
-
-                // Resolve collision based on smallest overlap
-                if (abs(overlapX) < abs(overlapY)) {
-                    // Horizontal collision - but we only adjust screen-space x
-                    x += overlapX;
-                    vx = 0;
-                } else {
-                    // Vertical collision
-                    y += overlapY;
-                    if (overlapY < 0) { // If hitting from above
-                        vy = 0;  // Just stop, no bounce
-                        y = platformTop - radius;  // Place exactly on top
-                    } else {  // If hitting from below
-                        vy = 0;  // Stop upward movement
-                    }
-                }
-            }
-        }
-
-        // For rope collisions, we need adjusted platforms
-        std::vector<Platform> adjustedPlatforms = platforms;
-        for (auto& platform : adjustedPlatforms) {
-            platform.rect.x -= static_cast<int>(cameraOffsetX);
-        }
-        
         leftHand.handlecollision(adjustedPlatforms);
         rightHand.handlecollision(adjustedPlatforms);
     }
