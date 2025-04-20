@@ -1,5 +1,5 @@
 # depslib dependency file v1.0
-1745080894 source:f:\game\main.cpp
+1745140507 source:f:\game\main.cpp
 	<SDL.h>
 	<SDL_image.h>
 	<SDL_mixer.h>
@@ -14,7 +14,7 @@
 
 1744512892 f:\game\defs.h
 
-1745079887 f:\game\graphics.h
+1745140042 f:\game\graphics.h
 	<SDL.h>
 	<SDL_image.h>
 	"defs.h"
@@ -22,7 +22,7 @@
 	<cmath>
 	<cstdlib>
 
-1745079625 f:\game\menupanel.h
+1745140042 f:\game\menupanel.h
 	<SDL_mixer.h>
 	<SDL.h>
 	<SDL_image.h>
@@ -55,7 +55,7 @@
 	"level.h"
 	<SDL.h>
 
-1745081240 f:\game\level_platforms.h
+1745140830 f:\game\level_platforms.h
 	"SDL.h"
 	<vector>
 	"graphics.h"

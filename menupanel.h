@@ -359,58 +359,103 @@ public:
             SDL_DestroyTexture(levelSelectTexture);
         }
 
-        // Calculate positions for level buttons
-        const int BUTTON_WIDTH = 250;
-        const int BUTTON_HEIGHT = 250;
+        // Calculate positions for level buttons with dynamic sizing
+        const int BASE_BUTTON_WIDTH = 200;  // Base width, will be adjusted to actual image size
+        const int BASE_BUTTON_HEIGHT = 200; // Base height, will be adjusted to actual image size
         const int HORIZONTAL_SPACING = 100;
         const int VERTICAL_SPACING = 100;
 
+        // Pre-load all level textures to get their dimensions
+        SDL_Texture* levelTextures[5];
+        int actualWidths[5];
+        int actualHeights[5];
+        
+        // Load all textures and get dimensions
+        for (int i = 0; i < 5; i++) {
+            levelTextures[i] = IMG_LoadTexture(renderer, levelPaths[i]);
+            if (levelTextures[i]) {
+                SDL_QueryTexture(levelTextures[i], NULL, NULL, &actualWidths[i], &actualHeights[i]);
+            } else {
+                // Default sizes if loading fails
+                actualWidths[i] = BASE_BUTTON_WIDTH;
+                actualHeights[i] = BASE_BUTTON_HEIGHT;
+            }
+        }
+        
+        // Calculate max button size in each row for consistent layout
+        int firstRowMaxHeight = 0;
+        int secondRowMaxHeight = 0;
+        
+        for (int i = 0; i < 3; i++) {
+            if (levelTextures[i] && actualHeights[i] > firstRowMaxHeight)
+                firstRowMaxHeight = actualHeights[i];
+        }
+        
+        for (int i = 3; i < 5; i++) {
+            if (levelTextures[i] && actualHeights[i] > secondRowMaxHeight)
+                secondRowMaxHeight = actualHeights[i];
+        }
+        
+        // Ensure minimum height
+        if (firstRowMaxHeight < BASE_BUTTON_HEIGHT) firstRowMaxHeight = BASE_BUTTON_HEIGHT;
+        if (secondRowMaxHeight < BASE_BUTTON_HEIGHT) secondRowMaxHeight = BASE_BUTTON_HEIGHT;
+        
         // Calculate total height of both rows
-        int totalHeight = (2 * BUTTON_HEIGHT) + VERTICAL_SPACING;
+        int totalHeight = firstRowMaxHeight + secondRowMaxHeight + VERTICAL_SPACING;
 
         // Center the entire grid vertically
         int firstRowY = (SCREEN_HEIGHT - totalHeight) / 2;
+        int secondRowY = firstRowY + firstRowMaxHeight + VERTICAL_SPACING;
 
-        // First row (3 levels)
-        int firstRowStartX = (SCREEN_WIDTH - (3 * BUTTON_WIDTH + 2 * HORIZONTAL_SPACING)) / 2;
-
-        // Second row (2 levels)
-        int secondRowY = firstRowY + BUTTON_HEIGHT + VERTICAL_SPACING;
-        int secondRowStartX = (SCREEN_WIDTH - (2 * BUTTON_WIDTH + HORIZONTAL_SPACING)) / 2;
+        // Calculate row widths
+        int firstRowWidth = 0;
+        for (int i = 0; i < 3; i++) {
+            firstRowWidth += actualWidths[i];
+        }
+        firstRowWidth += 2 * HORIZONTAL_SPACING; // Add spacing between buttons
+        
+        int secondRowWidth = actualWidths[3] + actualWidths[4] + HORIZONTAL_SPACING;
+        
+        // Calculate starting X for each row
+        int firstRowStartX = (SCREEN_WIDTH - firstRowWidth) / 2;
+        int secondRowStartX = (SCREEN_WIDTH - secondRowWidth) / 2;
 
         // Render level buttons
+        int currentFirstRowX = firstRowStartX;
+        int currentSecondRowX = secondRowStartX;
+        
         for (int i = 0; i < 5; i++) {
-            SDL_Texture* levelTexture = IMG_LoadTexture(renderer, levelPaths[i]);
-            if (levelTexture) {
+            if (levelTextures[i]) {
                 SDL_Rect levelRect;
 
                 if (i < 3) {
                     // First row (3 levels)
                     levelRect = {
-                        firstRowStartX + i * (BUTTON_WIDTH + HORIZONTAL_SPACING),
+                        currentFirstRowX,
                         firstRowY,
-                        BUTTON_WIDTH,
-                        BUTTON_HEIGHT
+                        actualWidths[i],
+                        actualHeights[i]
                     };
+                    currentFirstRowX += actualWidths[i] + HORIZONTAL_SPACING;
                 } else {
                     // Second row (2 levels)
                     levelRect = {
-                        secondRowStartX + (i - 3) * (BUTTON_WIDTH + HORIZONTAL_SPACING),
+                        currentSecondRowX,
                         secondRowY,
-                        BUTTON_WIDTH,
-                        BUTTON_HEIGHT
+                        actualWidths[i],
+                        actualHeights[i]
                     };
+                    currentSecondRowX += actualWidths[i] + HORIZONTAL_SPACING;
                 }
 
-                SDL_RenderCopy(renderer, levelTexture, NULL, &levelRect);
-                SDL_DestroyTexture(levelTexture);
+                SDL_RenderCopy(renderer, levelTextures[i], NULL, &levelRect);
 
-                // Store level rectangle for click detection
+                // Store level rectangle for click detection - USE THE EXACT SAME RECTANGLE
                 levelRects[i] = levelRect;
 
                 // Render lock if level is locked
                 if (!levelUnlocked[i] && levelLockTexture) {
-                    int lockWidth = BUTTON_WIDTH * 0.5;  // Lock size relative to level button
+                    int lockWidth = actualWidths[i] * 0.5;  // Lock size relative to level button
                     int lockHeight = lockWidth;  // Keep aspect ratio
                     SDL_Rect lockRect = {
                         levelRect.x + (levelRect.w - lockWidth) / 2,
@@ -420,6 +465,13 @@ public:
                     };
                     SDL_RenderCopy(renderer, levelLockTexture, NULL, &lockRect);
                 }
+            }
+        }
+        
+        // Clean up textures
+        for (int i = 0; i < 5; i++) {
+            if (levelTextures[i]) {
+                SDL_DestroyTexture(levelTextures[i]);
             }
         }
     }
@@ -434,8 +486,16 @@ public:
             for (int i = 0; i < 5; i++) {
                 // Only proceed if the level is unlocked
                 if (levelUnlocked[i]) {
-                    if (mouseX >= levelRects[i].x && mouseX <= levelRects[i].x + levelRects[i].w &&
-                        mouseY >= levelRects[i].y && mouseY <= levelRects[i].y + levelRects[i].h) {
+                    // Create a larger hit box for all levels
+                    SDL_Rect hitBox = levelRects[i];
+                    // Expand the hit box by 20 pixels in each direction
+                    hitBox.x -= 20;
+                    hitBox.y -= 20;
+                    hitBox.w += 40;
+                    hitBox.h += 40;
+
+                    if (mouseX >= hitBox.x && mouseX <= hitBox.x + hitBox.w &&
+                        mouseY >= hitBox.y && mouseY <= hitBox.y + hitBox.h) {
                         // Return the level index + 1 (1-based indexing)
                         return i + 1;
                     }

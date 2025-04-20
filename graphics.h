@@ -76,12 +76,68 @@ struct Platform {
     SDL_Texture* texture;
     double visualHeight;  // Actual visual height of the platform texture
     bool isSpike;        // New flag to identify if this platform is a spike
+    
+    // Moving platform properties
+    bool isMoving;
+    float startX, endX;
+    float speed;
+    bool movingForward;
+    bool movesVertically;  // New property to indicate vertical movement
 
-    Platform(SDL_Rect r, SDL_Texture* t, bool spike = false) : rect(r), texture(t), isSpike(spike) {
+    Platform(SDL_Rect r, SDL_Texture* t, bool spike = false) 
+        : rect(r), texture(t), isSpike(spike), isMoving(false), 
+          startX(0), endX(0), speed(0), movingForward(true), movesVertically(false) {
         // Get the actual texture dimensions
         int w, h;
         SDL_QueryTexture(t, NULL, NULL, &w, &h);
         visualHeight = h;
+    }
+    
+    // Constructor for moving platforms
+    Platform(SDL_Rect r, SDL_Texture* t, float startPos, float endPos, float moveSpeed, bool spike = false)
+        : rect(r), texture(t), isSpike(spike), isMoving(true),
+          startX(startPos), endX(endPos), speed(moveSpeed), movingForward(true), movesVertically(false) {
+        // Get the actual texture dimensions
+        int w, h;
+        SDL_QueryTexture(t, NULL, NULL, &w, &h);
+        visualHeight = h;
+        rect.x = static_cast<int>(startX); // Initialize position
+    }
+    
+    void update(float deltaTime = 1.0f) {
+        if (!isMoving) return;
+        
+        if (movesVertically) {
+            // Handle vertical movement (startX and endX are used as startY and endY)
+            if (movingForward) {
+                rect.y += static_cast<int>(speed * deltaTime);
+                if (rect.y >= endX) {
+                    rect.y = static_cast<int>(endX);
+                    movingForward = false;
+                }
+            } else {
+                rect.y -= static_cast<int>(speed * deltaTime);
+                if (rect.y <= startX) {
+                    rect.y = static_cast<int>(startX);
+                    movingForward = true;
+                }
+            }
+        } else {
+            // Handle horizontal movement
+            if (movingForward) {
+                rect.x += static_cast<int>(speed * deltaTime);
+                if (rect.x >= endX) {
+                    rect.x = static_cast<int>(endX);
+                    movingForward = false;
+                }
+            } else {
+                rect.x -= static_cast<int>(speed * deltaTime);
+                if (rect.x <= startX) {
+                    rect.x = static_cast<int>(startX);
+                    movingForward = true;
+                }
+            }
+        }
     }
 };
 
@@ -258,9 +314,12 @@ public:
     SDL_Texture* handTexture;
     SDL_Texture* grabTexture;  // New texture for grabbing state
     bool isLeftHand;
+    
+    // Keep platform tracking for debugging purposes
+    int grabbedPlatformIndex;  // Index of the grabbed platform in platforms vector
 
     ropehand(SDL_Renderer* renderer, double x1, double x2, double y1, double y2, int numberofparticles, bool isLeft)
-        : isLeftHand(isLeft) {
+        : isGrabbingObject(false), isLeftHand(isLeft), grabbedPlatformIndex(-1) {
         maxLength = sqrt(pow(x2 - x1, 2) + pow(y2 - y1, 2));  // Calculate maximum length
         currentLength = maxLength;
 
@@ -302,7 +361,6 @@ public:
             pn.yPrevious = y;
             pn.checkmovement = (i == 0);  // First particle is fixed to body
             parti.push_back(pn);
-            isGrabbingObject = false;
         }
         int segments = numberofparticles - 1;
         desireddistance = maxLength/segments;
@@ -311,9 +369,11 @@ public:
     ~ropehand() {
         if (handTexture) {
             SDL_DestroyTexture(handTexture);
+            handTexture = nullptr;
         }
         if (grabTexture) {
             SDL_DestroyTexture(grabTexture);
+            grabTexture = nullptr;
         }
     }
 
@@ -398,28 +458,43 @@ public:
         }
     }
 
+    // Standard grab method for non-moving objects
     void grab(double grabx, double graby) {
         // Update the last particle's position to the grab point
         parti.back().xCurrent = grabx;
         parti.back().yCurrent = graby;
         parti.back().checkmovement = true;
         isGrabbingObject = true;
+        
+        // Reset platform tracking when doing a standard grab
+        grabbedPlatformIndex = -1;
     }
 
     void release() {
          parti.back().checkmovement = false;
         isGrabbingObject = false;
+        grabbedPlatformIndex = -1;
     }
 
     void handlecollision(const std::vector<Platform>& platforms) {
         const double BOUNCE = 0.1; // Reduced bounce factor
 
-        // Check each particle in the rope
+        // Check each particle in the rope except the fixed ones
         for (auto& particle : parti) {
+            // Skip fixed particles (first and possibly last particle)
+            if (particle.checkmovement) continue;
+            
             for (const auto& platform : platforms) {
                 // Get current velocity
                 double velX = particle.xCurrent - particle.xPrevious;
                 double velY = particle.yCurrent - particle.yPrevious;
+
+                // Adjust velocity for moving platforms
+                if (platform.isMoving) {
+                    // Add platform's movement to relative velocity
+                    float platformVelocity = platform.speed * (platform.movingForward ? 1.0f : -1.0f);
+                    velX -= platformVelocity * 0.1f; // Same scale as used in main.cpp
+                }
 
                 // Check current position and predicted next position
                 double nextX = particle.xCurrent + velX;
@@ -427,7 +502,6 @@ public:
 
                 // Line segment intersection test between current and next position
                 bool collision = false;
-                double intersectX = 0, intersectY = 0;
 
                 // Check top edge of platform
                 if (velY > 0 && // Moving downward
@@ -550,7 +624,6 @@ private:
     }
 };
 
-
 class Character {
 public:
     double x, y;
@@ -578,6 +651,9 @@ public:
         extern double cameraOffsetX;
         return cameraOffsetX;
     }
+
+    // Add platforms reference for moving platform interaction
+    std::vector<Platform> currentPlatforms;
 
     Character(SDL_Renderer* renderer, double startX, double startY, double r, int handParticles)
         : x(startX), y(startY - 500), vx(0), vy(0), radius(r),  // Start 500 pixels above the platform
@@ -870,7 +946,7 @@ public:
                 leftHand.parti[i].xPrevious = leftHand.parti[i].xCurrent;
                 leftHand.parti[i].yPrevious = leftHand.parti[i].yCurrent;
             }
-
+            
             for (size_t i = 0; i < rightHand.parti.size(); i++) {
                 double t = static_cast<double>(i) / (rightHand.parti.size() - 1);
                 rightHand.parti[i].xCurrent = x + radius + (35 * t);  // Spread particles right
@@ -885,6 +961,8 @@ public:
             return;
         }
 
+        // Note: We've removed the moving platform handling code here since it's now done directly in main.cpp
+
         // Update movement direction based on input
         if (keystate[SDL_SCANCODE_LEFT]) facingDirection = -1.0;
         if (keystate[SDL_SCANCODE_RIGHT]) facingDirection = 1.0;
@@ -892,10 +970,10 @@ public:
         // Update both hands
         leftHand.step();
         rightHand.step();
-
+        
         // Apply swing forces before gravity
         applySwingForces(keystate);
-
+        
         // Always apply gravity, but less when swinging to preserve momentum
         if (leftHand.isGrabbingObject || rightHand.isGrabbingObject) {
             // Reduced gravity when holding on to something
@@ -946,6 +1024,11 @@ public:
         rightHand.attachtothebody(x + radius, y, radius * 0.2, false);
     }
 
+    // Add a reference to platforms for the update method to use
+    void setPlatformsReference(const std::vector<Platform>& platforms) {
+        currentPlatforms = platforms;
+    }
+
     void grab(bool isLeft, const std::vector<Platform>& platforms) {
         double handX, handY;
         if (isLeft) {
@@ -960,9 +1043,43 @@ public:
             if (handX >= platform.rect.x && handX <= platform.rect.x + platform.rect.w &&
                 handY >= platform.rect.y && handY <= platform.rect.y + platform.rect.h) {
                 if (isLeft) {
-                    leftHand.grab(handX, handY);
+                    // Set fixed grab point exactly at current position
+                    leftHand.parti.back().xCurrent = handX;
+                    leftHand.parti.back().yCurrent = handY;
+                    leftHand.parti.back().xPrevious = handX;
+                    leftHand.parti.back().yPrevious = handY;
+                    leftHand.parti.back().checkmovement = true;
+                    leftHand.isGrabbingObject = true;
+                    
+                    // If it's a moving platform, store position information
+                    if (platform.isMoving) {
+                        leftHand.grabbedPlatformIndex = -1;  // We'll handle movement directly in main.cpp
+                        for (int i = 0; i < platforms.size(); i++) {
+                            if (&platform == &platforms[i]) {
+                                leftHand.grabbedPlatformIndex = i;
+                                break;
+                            }
+                        }
+                    }
                 } else {
-                    rightHand.grab(handX, handY);
+                    // Set fixed grab point exactly at current position
+                    rightHand.parti.back().xCurrent = handX;
+                    rightHand.parti.back().yCurrent = handY;
+                    rightHand.parti.back().xPrevious = handX;
+                    rightHand.parti.back().yPrevious = handY;
+                    rightHand.parti.back().checkmovement = true;
+                    rightHand.isGrabbingObject = true;
+                    
+                    // If it's a moving platform, store position information
+                    if (platform.isMoving) {
+                        rightHand.grabbedPlatformIndex = -1;  // We'll handle movement directly in main.cpp
+                        for (int i = 0; i < platforms.size(); i++) {
+                            if (&platform == &platforms[i]) {
+                                rightHand.grabbedPlatformIndex = i;
+                                break;
+                            }
+                        }
+                    }
                 }
                 break;
             }
@@ -986,10 +1103,48 @@ public:
         for (const auto& platform : platforms) {
             if (handX >= platform.rect.x && handX <= platform.rect.x + platform.rect.w &&
                 handY >= platform.rect.y && handY <= platform.rect.y + platform.rect.h) {
+                
+                // Adjust grab position back to screen space
+                double screenSpaceHandX = handX - cameraOffsetX;
+                
                 if (isLeft) {
-                    leftHand.grab(handX - cameraOffsetX, handY);
+                    // Set fixed grab point exactly at current position
+                    leftHand.parti.back().xCurrent = screenSpaceHandX;
+                    leftHand.parti.back().yCurrent = handY;
+                    leftHand.parti.back().xPrevious = screenSpaceHandX;
+                    leftHand.parti.back().yPrevious = handY;
+                    leftHand.parti.back().checkmovement = true;
+                    leftHand.isGrabbingObject = true;
+                    
+                    // If it's a moving platform, store position information
+                    if (platform.isMoving) {
+                        leftHand.grabbedPlatformIndex = -1;  // We'll handle movement directly in main.cpp
+                        for (int i = 0; i < platforms.size(); i++) {
+                            if (&platform == &platforms[i]) {
+                                leftHand.grabbedPlatformIndex = i;
+                                break;
+                            }
+                        }
+                    }
                 } else {
-                    rightHand.grab(handX - cameraOffsetX, handY);
+                    // Set fixed grab point exactly at current position
+                    rightHand.parti.back().xCurrent = screenSpaceHandX;
+                    rightHand.parti.back().yCurrent = handY;
+                    rightHand.parti.back().xPrevious = screenSpaceHandX;
+                    rightHand.parti.back().yPrevious = handY;
+                    rightHand.parti.back().checkmovement = true;
+                    rightHand.isGrabbingObject = true;
+                    
+                    // If it's a moving platform, store position information
+                    if (platform.isMoving) {
+                        rightHand.grabbedPlatformIndex = -1;  // We'll handle movement directly in main.cpp
+                        for (int i = 0; i < platforms.size(); i++) {
+                            if (&platform == &platforms[i]) {
+                                rightHand.grabbedPlatformIndex = i;
+                                break;
+                            }
+                        }
+                    }
                 }
                 break;
             }
@@ -1221,19 +1376,8 @@ public:
     }
 
     void resetPosition() {
-        // Reset position to initial position based on level
-        extern int selectedLevel;  // Properly declare the external variable
-        
-        if (selectedLevel == 3) {
-            // Level 3 specific starting position - on top of first round platform
-            x = 250;  // Center of the first round platform (200 + 100/2)
-            y = 450;  // Just above the platform at y=500
-        } else {
-            // Default starting position for other levels
-            x = 300;  // Initial x position
-            y = 100;  // Initial y position
-        }
-        
+        x = 300;  // Initial x position
+        y = 100;  // Initial y position
         vx = 0;
         vy = 0;
 
@@ -1262,29 +1406,17 @@ public:
         maxSwingSpeed = 0;
         swingEnergy = 0;
     }
+
+private:
+    // Movement and physics constants
+    const double JUMP_BOOST = 1.4;     // Boost multiplier when releasing
+    const double FORWARD_TOSS = 50.0;  // Forward momentum on release
+    const double UPWARD_BOOST = 40.0;  // Upward impulse on release
 };
 
 void renderPlatform(SDL_Renderer* renderer, SDL_Texture* texture, SDL_Rect rect) {
-    // Apply jitter effect
-    int jitterX = rand() % 3 - 1; // Random offset between -1 and 1
-    int jitterY = rand() % 3 - 1; // Random offset between -1 and 1
-
-    // Apply wobble effect
-    double wobble = sin(SDL_GetTicks() / 100.0) * 5; // Wobble angle
-
-    // Adjust rectangle for jitter
-    SDL_Rect jitteredRect = {
-        rect.x + jitterX,
-        rect.y + jitterY,
-        rect.w,
-        rect.h
-    };
-
-    // Calculate center point for rotation
-    SDL_Point center = {rect.w / 2, rect.h / 2};
-
-    // Render with rotation and wobble
-    SDL_RenderCopyEx(renderer, texture, NULL, &jitteredRect, wobble, &center, SDL_FLIP_NONE);
+    // Simple direct rendering without jitter or wobble effects
+    SDL_RenderCopy(renderer, texture, NULL, &rect);
 }
 
 #endif

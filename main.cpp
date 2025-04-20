@@ -46,7 +46,7 @@ bool characterUnlocked[] = {true, false, false, false};  // Only red character i
 SDL_Texture* lockTexture = nullptr;  // Will store the lock image texture
 
 // Add these global variables after the level paths
-bool levelUnlocked[] = {true, true, true, false, false};  // Level 1, 2, and 3 unlocked for testing
+bool levelUnlocked[] = {true, true, true, true, true};  // All levels unlocked for testing
 SDL_Texture* levelLockTexture = nullptr;  // Will store the level lock image texture
 int selectedLevel = 1;  // Currently selected level, starts at 1
 
@@ -67,6 +67,7 @@ bool isSpikewallActive = false;
 SDL_Rect level1FinishRect = {SCREEN_WIDTH - 300, 400, 100, 50};
 SDL_Rect level2FinishRect = {SCREEN_WIDTH * 3 - 300, 350, 200, 100};
 SDL_Rect level3FinishRect = {SCREEN_WIDTH * 3 - 300, 350, 200, 100};
+SDL_Rect level4FinishRect = {SCREEN_WIDTH * 3 - 300, 350, 200, 100};
 bool finishLineEnabled = true;
 
 int SDL_main(int argc, char* argv[]) {
@@ -244,8 +245,8 @@ int SDL_main(int argc, char* argv[]) {
                 if (event.type == SDL_KEYDOWN) {
                     switch (event.key.keysym.scancode) {
                         case SDL_SCANCODE_A:  // Left hand grab
-                            if (selectedLevel == 2 || selectedLevel == 3) {
-                                // Use the camera-aware grab method for Level 2 and Level 3
+                            if (selectedLevel == 2 || selectedLevel == 3 || selectedLevel == 4) {
+                                // Use the camera-aware grab method for levels with camera system
                                 player.grabWithCamera(true, core.platforms, cameraOffsetX);
                             } else {
                                 player.grab(true, core.platforms);
@@ -255,8 +256,8 @@ int SDL_main(int argc, char* argv[]) {
                             }
                             break;
                         case SDL_SCANCODE_D:  // Right hand grab
-                            if (selectedLevel == 2 || selectedLevel == 3) {
-                                // Use the camera-aware grab method for Level 2 and Level 3
+                            if (selectedLevel == 2 || selectedLevel == 3 || selectedLevel == 4) {
+                                // Use the camera-aware grab method for levels with camera system
                                 player.grabWithCamera(false, core.platforms, cameraOffsetX);
                             } else {
                                 player.grab(false, core.platforms);
@@ -315,8 +316,8 @@ int SDL_main(int argc, char* argv[]) {
             menu.renderLevelSelection(levelPaths, levelUnlocked);
         }
         else if (currentState == PLAYING) {
-            // Update camera offset based on character position (for Level 2 and Level 3)
-            if (selectedLevel == 2 || selectedLevel == 3) {
+            // Update camera offset based on character position (for Level 2, 3, and 4)
+            if (selectedLevel == 2 || selectedLevel == 3 || selectedLevel == 4) {
                 // Get current time for transition cooldown
                 Uint32 currentTime = SDL_GetTicks();
 
@@ -424,22 +425,104 @@ int SDL_main(int argc, char* argv[]) {
                 currentScreenIndex = 0;  // Reset screen index for other levels
             }
 
+            // Handle moving platform in Level 4
+            if (selectedLevel == 4) {
+                // First, save current positions of platforms before updating
+                std::vector<int> oldPositions;
+                for (const auto& platform : core.platforms) {
+                    if (platform.isMoving) {
+                        oldPositions.push_back(platform.rect.x);
+                    }
+                }
+                
+                // Update all moving platforms
+                int platformIndex = 0;
+                for (auto& platform : core.platforms) {
+                    if (platform.isMoving) {
+                        // Store the old position before updating
+                        int oldX = oldPositions[platformIndex++];
+                        
+                        // Update the platform position
+                        platform.update(1.0f);
+                        
+                        // Calculate the actual change in platform position
+                        int deltaX = platform.rect.x - oldX;
+                        
+                        // Check if platform is in current screen's range
+                        int worldX = platform.rect.x;
+                        int screenStartX = currentScreenIndex * SCREEN_WIDTH;
+                        int screenEndX = (currentScreenIndex + 1) * SCREEN_WIDTH;
+                        
+                        // Only process platforms that are either:
+                        // 1. Visible in the current screen, or
+                        // 2. Being grabbed by the player
+                        bool isInCurrentScreen = (worldX >= screenStartX - platform.rect.w && 
+                                                  worldX <= screenEndX);
+                        
+                        // If platform is on current screen or being grabbed, check for hand interaction
+                        if (isInCurrentScreen || 
+                            (player.leftHand.isGrabbingObject && player.leftHand.grabbedPlatformIndex == (&platform - &core.platforms[0])) ||
+                            (player.rightHand.isGrabbingObject && player.rightHand.grabbedPlatformIndex == (&platform - &core.platforms[0]))) {
+                            
+                            // Left hand check
+                            if (player.leftHand.isGrabbingObject) {
+                                double handX = player.leftHand.parti.back().xCurrent + cameraOffsetX; // Convert to world coordinates
+                                double handY = player.leftHand.parti.back().yCurrent;
+                                
+                                if (handX >= oldX && handX <= oldX + platform.rect.w &&
+                                    handY >= platform.rect.y && handY <= platform.rect.y + platform.rect.h) {
+                                    // Hand is on this platform - move all particles of the hand
+                                    for (auto& particle : player.leftHand.parti) {
+                                        particle.xCurrent += deltaX;
+                                        particle.xPrevious += deltaX;
+                                    }
+                                    // Move character too
+                                    player.x += deltaX;
+                                }
+                            }
+                            
+                            // Right hand check
+                            if (player.rightHand.isGrabbingObject) {
+                                double handX = player.rightHand.parti.back().xCurrent + cameraOffsetX; // Convert to world coordinates
+                                double handY = player.rightHand.parti.back().yCurrent;
+                                
+                                if (handX >= oldX && handX <= oldX + platform.rect.w &&
+                                    handY >= platform.rect.y && handY <= platform.rect.y + platform.rect.h) {
+                                    // Hand is on this platform - move all particles of the hand
+                                    for (auto& particle : player.rightHand.parti) {
+                                        particle.xCurrent += deltaX;
+                                        particle.xPrevious += deltaX;
+                                    }
+                                    // Move character too if not already moved by left hand
+                                    if (!player.leftHand.isGrabbingObject) {
+                                        player.x += deltaX;
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+                
+                // Provide current platforms to character for moving platform handling
+                player.setPlatformsReference(core.platforms);
+            }
+
             // Update player physics
         player.update();
 
             // Handle collisions with appropriate method based on level
-            if (selectedLevel == 2 || selectedLevel == 3) {
-                // Adjust platforms for screen positioning in Level 2/3
+            if (selectedLevel == 2 || selectedLevel == 3 || selectedLevel == 4) {
+                // Adjust platforms for screen positioning in Level 2/3/4
                 std::vector<Platform> adjustedPlatforms = core.platforms;
                 for (auto& platform : adjustedPlatforms) {
                     // If this is a platform that should appear on multiple screens:
                     // For last platform of screen 0 (at x ~= SCREEN_WIDTH - 200)
-                    if ((selectedLevel == 2 || selectedLevel == 3) && currentScreenIndex == 1 && platform.rect.x == SCREEN_WIDTH - 200) {
+                    if ((selectedLevel == 2 || selectedLevel == 3 || selectedLevel == 4) && currentScreenIndex == 1 && platform.rect.x == SCREEN_WIDTH - 200) {
                         // Create a copy positioned at the start of screen 1
                         platform.rect.x = 150 - static_cast<int>(cameraOffsetX);
                     }
                     // For last platform of screen 1
-                    else if ((selectedLevel == 2 || selectedLevel == 3) && currentScreenIndex == 2 && platform.rect.x == SCREEN_WIDTH * 2 - 200) {
+                    else if ((selectedLevel == 2 || selectedLevel == 3 || selectedLevel == 4) && currentScreenIndex == 2 && platform.rect.x == SCREEN_WIDTH * 2 - 200) {
                         // Create a copy positioned at the start of screen 2
                         platform.rect.x = SCREEN_WIDTH * 2 + 150 - static_cast<int>(cameraOffsetX);
                     }
@@ -487,10 +570,17 @@ int SDL_main(int argc, char* argv[]) {
                     isSpikewallActive = false;
                 }
 
-                // Special finish line check for Level 2 & 3 - only on the last screen
-                if (finishLineEnabled && (selectedLevel == 2 || selectedLevel == 3) && currentScreenIndex == SCREEN_COUNT - 1) {
+                // Special finish line check for Level 2, 3 & 4 - only on the last screen
+                if (finishLineEnabled && (selectedLevel == 2 || selectedLevel == 3 || selectedLevel == 4) && currentScreenIndex == SCREEN_COUNT - 1) {
                     // Use the appropriate finish line rectangle for this level
-                    SDL_Rect finishRect = (selectedLevel == 2) ? level2FinishRect : level3FinishRect;
+                    SDL_Rect finishRect;
+                    if (selectedLevel == 2) {
+                        finishRect = level2FinishRect;
+                    } else if (selectedLevel == 3) {
+                        finishRect = level3FinishRect;
+                    } else { // Level 4
+                        finishRect = level4FinishRect;
+                    }
 
                     // Adjust for camera offset
                     SDL_Rect adjustedFinishRect = finishRect;
@@ -514,7 +604,6 @@ int SDL_main(int argc, char* argv[]) {
                         backgroundMusic.playApplauseSound();
                     }
                 }
-                // Special finish line check for Level 3 has been merged with Level 2 check above
 
                 // Handle normal collisions with screen-adjusted platforms
                 if (!player.showingCongratulations) {
@@ -562,19 +651,20 @@ int SDL_main(int argc, char* argv[]) {
 
             // Render background with camera offset
             SDL_Texture* backgroundTexture = nullptr;
+            const char* backgroundPath = "F:\\Game\\graphic\\level1_background.png";
+            
             if (selectedLevel == 2) {
-                backgroundTexture = IMG_LoadTexture(core.renderer, "F:\\Game\\graphic\\level2_background.png");
-            } else if (selectedLevel == 3) {
-                backgroundTexture = IMG_LoadTexture(core.renderer, "F:\\Game\\graphic\\level1_background.png"); // Reuse level 1 background for now
-            } else {
-                backgroundTexture = IMG_LoadTexture(core.renderer, "F:\\Game\\graphic\\level1_background.png");
+                backgroundPath = "F:\\Game\\graphic\\level2_background.png";
             }
+            // All other levels use level1 background
+            
+            backgroundTexture = IMG_LoadTexture(core.renderer, backgroundPath);
 
             if (backgroundTexture) {
                 SDL_Rect bgRect = {
                     static_cast<int>(-cameraOffsetX),
                     0,
-                    SCREEN_WIDTH * ((selectedLevel == 2 || selectedLevel == 3) ? 3 : 1),  // Extra wide background for Level 2 and 3
+                    SCREEN_WIDTH * ((selectedLevel == 2 || selectedLevel == 3 || selectedLevel == 4) ? 3 : 1),  // Extra wide background for multi-screen levels
                     SCREEN_HEIGHT
                 };
                 SDL_RenderCopy(core.renderer, backgroundTexture, NULL, &bgRect);
