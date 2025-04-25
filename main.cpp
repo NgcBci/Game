@@ -93,22 +93,12 @@ int savedScreenIndex = 0;
 double savedCameraOffsetX = 0;
 
 int SDL_main(int argc, char* argv[]) {
-    if (SDL_Init(SDL_INIT_VIDEO | SDL_INIT_AUDIO) < 0) {
-        std::cerr << "SDL could not initialize! SDL_Error: " << SDL_GetError() << std::endl;
-        return 1;
-    }
-
-    if (Mix_OpenAudio(44100, MIX_DEFAULT_FORMAT, 2, 2048) < 0) {
-        std::cerr << "SDL_mixer could not initialize! SDL_mixer Error: " << Mix_GetError() << std::endl;
-        return 1;
-    }
-
     Graphics core;
     core.init();
 
     // Create character with medium radius (30 pixels = 60x60 total size)
     Character player(core.renderer, 300, 100, 30, 10);  // x, y, radius=30, particles=10
-    
+
     // Set the initial character texture to the currently selected character
     player.setTexture(core.renderer, characterGamePaths[currentCharacterIndex]);
 
@@ -139,18 +129,15 @@ int SDL_main(int argc, char* argv[]) {
     backgroundMusic.loadFallSound("F:\\Game\\sounds\\huhu.mp3");
     backgroundMusic.loadApplauseSound("F:\\Game\\sounds\\applause.mp3");
     backgroundMusic.play();
-    
+
     // Load back button texture
     backButtonTexture = IMG_LoadTexture(core.renderer, "F:\\Game\\graphic\\back (2).png");
     if (!backButtonTexture) {
         // SDL_Log("Failed to load back button texture: %s", IMG_GetError());
     }
-    
+
     // Load check new character texture
     checkNewCharTexture = IMG_LoadTexture(core.renderer, "F:\\Game\\graphic\\checknewchar.png");
-    if (!checkNewCharTexture) {
-        // SDL_Log("Failed to load check new character texture: %s", IMG_GetError());
-    } else {
         // Get texture dimensions and center it on screen
         int texWidth, texHeight;
         SDL_QueryTexture(checkNewCharTexture, NULL, NULL, &texWidth, &texHeight);
@@ -160,8 +147,6 @@ int SDL_main(int argc, char* argv[]) {
             texWidth,
             texHeight
         };
-    }
-
     // Initialize level-specific objects
     if (spikeWall == nullptr) {
         // Create the spike wall - full screen height
@@ -188,9 +173,8 @@ int SDL_main(int argc, char* argv[]) {
             if (currentState == MENU) {
                 menu.handleEvent(event);
 
-                // Handle both keyboard and mouse events for menu state changes
-                if ((event.type == SDL_KEYDOWN && event.key.keysym.scancode == SDL_SCANCODE_RETURN) ||
-                    (event.type == SDL_MOUSEBUTTONDOWN && event.button.button == SDL_BUTTON_LEFT)) {
+                // Handle mouse clicks for menu state changes
+                if (event.type == SDL_MOUSEBUTTONDOWN && event.button.button == SDL_BUTTON_LEFT) {
                     switch (menu.getSelectedIndex()) {
                         case 0:  // Start Game
                             currentState = CHARACTER_SELECTION;
@@ -247,7 +231,7 @@ int SDL_main(int argc, char* argv[]) {
                              characterUnlocked[currentCharacterIndex]) {
                         // Update the player character texture based on selection
                         player.setTexture(core.renderer, characterGamePaths[currentCharacterIndex]);
-                        
+
                         // Move to level selection screen
                         currentState = LEVEL_SELECTION;
                     }
@@ -266,11 +250,11 @@ int SDL_main(int argc, char* argv[]) {
                         player.setTexture(core.renderer, characterGamePaths[currentCharacterIndex]);
                     }
                 }
-                
+
                 if (event.type == SDL_MOUSEBUTTONDOWN) {
                     int mouseX = event.button.x;
                     int mouseY = event.button.y;
-                    
+
                     // Check if back button was clicked
                     if (mouseX >= backButtonRect.x && mouseX <= backButtonRect.x + backButtonRect.w &&
                         mouseY >= backButtonRect.y && mouseY <= backButtonRect.y + backButtonRect.h) {
@@ -301,7 +285,7 @@ int SDL_main(int argc, char* argv[]) {
                     player.showingCongratulations = false;
                     showingNewCharPrompt = false;
                     hasUnlockedNewChar = false;
-                    
+
                     // Reset applause sound flag so it can play again
                     backgroundMusic.resetApplause();
 
@@ -333,7 +317,7 @@ int SDL_main(int argc, char* argv[]) {
                                 finishLineEnabled = true;
                                 // No need to restore camera position since leaving the level
                                 break;
-                                
+
                             case SDL_SCANCODE_N:  // No - go to level selection
                                 showingNewCharPrompt = false;
                                 hasUnlockedNewChar = false;
@@ -342,7 +326,7 @@ int SDL_main(int argc, char* argv[]) {
                                 finishLineEnabled = true;
                                 // No need to restore camera position since leaving the level
                                 break;
-                                
+
                             default:
                                 // Ignore other keys when showing prompt
                                 break;
@@ -381,16 +365,8 @@ int SDL_main(int argc, char* argv[]) {
                                 if (player.showingCongratulations) {
                                     // Only show the character unlock prompt for levels 1-3
                                     if (hasUnlockedNewChar && selectedLevel >= 1 && selectedLevel <= 3) {
-                                        // Add debug output
-                                        // SDL_Log("Showing new character prompt for level %d", selectedLevel);
-                                        
-                                        // Save current camera position before showing prompt
                                         savedScreenIndex = currentScreenIndex;
                                         savedCameraOffsetX = cameraOffsetX;
-                                        // SDL_Log("Saved camera position: screen %d, offset %.2f", 
-                                        //        savedScreenIndex, savedCameraOffsetX);
-                                        
-                                        // Show the character unlock prompt instead of going directly to level selection
                                         showingNewCharPrompt = true;
                                     } else {
                                         // Either no new character unlocked or it's level 4 or 5
@@ -427,7 +403,7 @@ int SDL_main(int argc, char* argv[]) {
                 else if (event.type == SDL_MOUSEBUTTONDOWN && !player.showingCongratulations) {
                     int mouseX = event.button.x;
                     int mouseY = event.button.y;
-                    
+
                     // Check if back button was clicked
                     if (mouseX >= backButtonRect.x && mouseX <= backButtonRect.x + backButtonRect.w &&
                         mouseY >= backButtonRect.y && mouseY <= backButtonRect.y + backButtonRect.h) {
@@ -441,7 +417,7 @@ int SDL_main(int argc, char* argv[]) {
                 else if (event.type == SDL_MOUSEBUTTONDOWN && showingNewCharPrompt) {
                     int mouseX = event.button.x;
                     int mouseY = event.button.y;
-                    
+
                     // Define Y/N button areas (approximating based on image)
                     // Assuming the Y button is on the left side of the prompt
                     SDL_Rect yesButtonRect = {
@@ -449,14 +425,14 @@ int SDL_main(int argc, char* argv[]) {
                         checkNewCharRect.y + checkNewCharRect.h * 3/4,
                         80, 40
                     };
-                    
+
                     // Assuming the N button is on the right side of the prompt
                     SDL_Rect noButtonRect = {
                         checkNewCharRect.x + checkNewCharRect.w * 3/4 - 40,
                         checkNewCharRect.y + checkNewCharRect.h * 3/4,
                         80, 40
                     };
-                    
+
                     // Check if Yes button was clicked
                     if (mouseX >= yesButtonRect.x && mouseX <= yesButtonRect.x + yesButtonRect.w &&
                         mouseY >= yesButtonRect.y && mouseY <= yesButtonRect.y + yesButtonRect.h) {
@@ -488,7 +464,7 @@ int SDL_main(int argc, char* argv[]) {
                 else if (event.type == SDL_MOUSEBUTTONDOWN) {
                     int mouseX = event.button.x;
                     int mouseY = event.button.y;
-                    
+
                     // Check if back button was clicked
                     if (mouseX >= backButtonRect.x && mouseX <= backButtonRect.x + backButtonRect.w &&
                         mouseY >= backButtonRect.y && mouseY <= backButtonRect.y + backButtonRect.h) {
@@ -496,13 +472,13 @@ int SDL_main(int argc, char* argv[]) {
                         continue;
                     }
                 }
-                
+
                 // Handle volume slider events if in OPTIONS state
                 if (currentState == OPTIONS) {
                     if (menu.handleVolumeSliders(event)) {
                         backgroundMusic.setMusicVolume(menu.getMusicVolume());
                         backgroundMusic.setSfxVolume(menu.getSfxVolume());
-                        
+
                         // Store volume settings in a file
                         FILE* volumeFile = fopen("F:\\Game\\volume_settings.dat", "wb");
                         if (volumeFile) {
@@ -528,7 +504,7 @@ int SDL_main(int argc, char* argv[]) {
         else if (currentState == CHARACTER_SELECTION) {
             // Use the new method from MenuPanel to render character selection
             menu.renderCharacterSelection(currentCharacterIndex, characterMenuPaths, characterUnlocked);
-            
+
             // Render back button
             if (backButtonTexture) {
                 SDL_RenderCopy(core.renderer, backButtonTexture, NULL, &backButtonRect);
@@ -537,7 +513,7 @@ int SDL_main(int argc, char* argv[]) {
         else if (currentState == LEVEL_SELECTION) {
             // Use the new method from MenuPanel to render level selection
             menu.renderLevelSelection(levelPaths, levelUnlocked);
-            
+
             // Render back button
             if (backButtonTexture) {
                 SDL_RenderCopy(core.renderer, backButtonTexture, NULL, &backButtonRect);
@@ -581,10 +557,10 @@ int SDL_main(int argc, char* argv[]) {
                     // Position player at the beginning of the new screen
                     // But maintain the same relative position to the platform
                     double oldX = player.x;
-                    player.x = 150 + relativePos;
+                    player.x = 150 + relativePos; // nhay sang man hinh tiep
 
                     // Keep vertical position and velocity
-
+// ng nhay thi tay cung nhay
                     // Update hand positions to maintain their relative positions
                     for (size_t i = 0; i < player.leftHand.parti.size(); i++) {
                         // Adjust for new player position
@@ -964,28 +940,28 @@ int SDL_main(int argc, char* argv[]) {
                         }
                     }
                 }
-                
+
                 // Add finish line detection specific for Level 5
                 if (finishLineEnabled) {
                     // Only check finish line if the poll is removed (both buttons activated)
                     if (activatedButtonCount == 2) {
                         SDL_Rect finishRect = level5FinishRect;
-                        
+
                         // Check if player is touching the finish line
                         if (player.x + player.radius > finishRect.x &&
                             player.x - player.radius < finishRect.x + finishRect.w &&
                             player.y + player.radius > finishRect.y &&
                             player.y - player.radius < finishRect.y + finishRect.h) {
-                            
+
                             // Player reached the finish line
                             player.hasReachedFinish = true;
                             player.showingCongratulations = true;
                             player.vx = 0;
                             player.vy = 0;
-                            
+
                             // Disable finish line detection to prevent re-triggering
                             finishLineEnabled = false;
-                            
+
                             // Force reset and play applause sound regardless of previous state
                             backgroundMusic.resetApplause();
                             backgroundMusic.playApplauseSound();
@@ -1027,7 +1003,7 @@ int SDL_main(int argc, char* argv[]) {
                 if (selectedLevel < 5) {  // Only unlock if there is a next level
                     levelUnlocked[selectedLevel] = true;  // Unlock the next level (index is 0-based)
                 }
-                
+
                 // Unlock characters based on level completion
                 if (selectedLevel == 1 && !characterUnlocked[1]) {
                     // Unlock mint character after completing level 1
@@ -1048,7 +1024,7 @@ int SDL_main(int argc, char* argv[]) {
                     hasUnlockedNewChar = true;
                 }
             }
-            
+
             // Render back button (only if not in congratulations screen and not showing prompt)
             if (backButtonTexture && !player.showingCongratulations && !showingNewCharPrompt) {
                 SDL_RenderCopy(core.renderer, backButtonTexture, NULL, &backButtonRect);
@@ -1075,9 +1051,9 @@ int SDL_main(int argc, char* argv[]) {
                 }
                 volumeInitialized = true;
             }
-            
+
             menu.renderOptions();
-            
+
             if (backButtonTexture) {
                 SDL_RenderCopy(core.renderer, backButtonTexture, NULL, &backButtonRect);
             }
@@ -1085,7 +1061,7 @@ int SDL_main(int argc, char* argv[]) {
         else if (currentState == HOWTOPLAY) {
             // Render how to play screen with guide image
             core.renderHowToPlay();
-            
+
             // Render back button
             if (backButtonTexture) {
                 SDL_RenderCopy(core.renderer, backButtonTexture, NULL, &backButtonRect);
@@ -1117,13 +1093,13 @@ int SDL_main(int argc, char* argv[]) {
         delete spikeWall;
         spikeWall = nullptr;
     }
-    
+
     // Cleanup back button texture
     if (backButtonTexture) {
         SDL_DestroyTexture(backButtonTexture);
         backButtonTexture = nullptr;
     }
-    
+
     // Cleanup check new character texture
     if (checkNewCharTexture) {
         SDL_DestroyTexture(checkNewCharTexture);

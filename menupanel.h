@@ -14,38 +14,38 @@ struct MenuItem {
     void (*action)();  // Function pointer for the action to take when selected
 };
 
-// Add a Slider struct for volume controls
+// Add a Slider struct for volume controls, slider trong options
 struct Slider {
     SDL_Rect trackRect;     // Rectangle for the slider track
-    SDL_Rect knobRect;      // Rectangle for the slider knob
+    SDL_Rect knobRect;      // cai nut de keo i
     int value;              // Current value (0-128)
     int minValue, maxValue; // Min and max values
     bool isDragging;        // Whether the slider is being dragged
-    
+
     Slider() : value(128), minValue(0), maxValue(128), isDragging(false) {}
-    
+
     void setPosition(int x, int y, int width, int height) {
         trackRect = {x, y, width, height};
         updateKnobPosition();
     }
-    
+    // update cai knob nma trong khoang tu min den max
     void setValue(int newValue) {
         value = (newValue < minValue) ? minValue : ((newValue > maxValue) ? maxValue : newValue);
         updateKnobPosition();
     }
-    
+
     void updateKnobPosition() {
         // Calculate knob position based on value
         float percentage = static_cast<float>(value - minValue) / (maxValue - minValue);
         int knobX = trackRect.x + static_cast<int>(percentage * (trackRect.w - 30)); // 30 is knob width
         knobRect = {knobX, trackRect.y - 10, 30, trackRect.h + 20}; // Make knob slightly larger than track
     }
-    
+    // lay event chuot de chinh vi tri cai knob
     bool handleEvent(SDL_Event& event) {
         if (event.type == SDL_MOUSEBUTTONDOWN) {
             int mouseX = event.button.x;
             int mouseY = event.button.y;
-            
+
             // Check if mouse is on knob
             if (mouseX >= knobRect.x && mouseX <= knobRect.x + knobRect.w &&
                 mouseY >= knobRect.y && mouseY <= knobRect.y + knobRect.h) {
@@ -67,42 +67,42 @@ struct Slider {
         }
         else if (event.type == SDL_MOUSEMOTION && isDragging) {
             int mouseX = event.motion.x;
-            
+
             // Constrain to track boundaries
             if (mouseX < trackRect.x)
                 mouseX = trackRect.x;
             else if (mouseX > trackRect.x + trackRect.w)
                 mouseX = trackRect.x + trackRect.w;
-            
+
             // Update value based on drag position
             float percentage = static_cast<float>(mouseX - trackRect.x) / trackRect.w;
             setValue(static_cast<int>(minValue + percentage * (maxValue - minValue)));
             return true;
         }
-        
+
         return false;
     }
-    
+    // ve may cai can thiet de cho cai slider
     void render(SDL_Renderer* renderer) {
         // Draw track background
         SDL_SetRenderDrawColor(renderer, 80, 80, 80, 255); // Darker gray
-        
+
         // Draw filled track
         SDL_Rect filledTrack = trackRect;
         filledTrack.w = static_cast<int>((float)value / maxValue * trackRect.w);
-        
+
         // Draw empty track
         SDL_SetRenderDrawColor(renderer, 150, 150, 150, 255); // Light gray
         SDL_RenderFillRect(renderer, &trackRect);
-        
+
         // Draw filled portion
         SDL_SetRenderDrawColor(renderer, 70, 130, 180, 255); // Steel blue
         SDL_RenderFillRect(renderer, &filledTrack);
-        
+
         // Draw track border
         SDL_SetRenderDrawColor(renderer, 50, 50, 50, 255);
         SDL_RenderDrawRect(renderer, &trackRect);
-        
+
         // Draw knob with gradient effect
         // Outer knob (shadow)
         SDL_SetRenderDrawColor(renderer, 40, 40, 40, 255);
@@ -110,42 +110,42 @@ struct Slider {
         shadowRect.x += 2;
         shadowRect.y += 2;
         SDL_RenderFillRect(renderer, &shadowRect);
-        
+
         // Inner knob (main)
         SDL_SetRenderDrawColor(renderer, 220, 220, 220, 255); // Light gray
         SDL_RenderFillRect(renderer, &knobRect);
-        
+
         // Knob highlight (top-left edge for 3D effect)
         SDL_SetRenderDrawColor(renderer, 255, 255, 255, 255); // White
-        
+
         // Horizontal highlight line
-        SDL_RenderDrawLine(renderer, 
-                          knobRect.x + 2, 
-                          knobRect.y + 2, 
-                          knobRect.x + knobRect.w - 2, 
+        SDL_RenderDrawLine(renderer,
+                          knobRect.x + 2,
+                          knobRect.y + 2,
+                          knobRect.x + knobRect.w - 2,
                           knobRect.y + 2);
-        
+
         // Vertical highlight line
-        SDL_RenderDrawLine(renderer, 
-                          knobRect.x + 2, 
-                          knobRect.y + 2, 
-                          knobRect.x + 2, 
+        SDL_RenderDrawLine(renderer,
+                          knobRect.x + 2,
+                          knobRect.y + 2,
+                          knobRect.x + 2,
                           knobRect.y + knobRect.h - 2);
-        
+
         // Knob border
         SDL_SetRenderDrawColor(renderer, 0, 0, 0, 255); // Black
         SDL_RenderDrawRect(renderer, &knobRect);
-        
+
         // Draw percentage indicator on knob
         int percentage = static_cast<int>((float)value / maxValue * 100);
-        
+
         // Draw percentage text on knob (visual indicator)
         if (percentage > 0) {
             // Draw a line on the knob as a visual percentage indicator
             int lineHeight = static_cast<int>((float)knobRect.h * 0.6f);
             int startY = knobRect.y + (knobRect.h - lineHeight) / 2;
             int endY = startY + lineHeight;
-            
+
             SDL_SetRenderDrawColor(renderer, 0, 0, 0, 255);
             SDL_RenderDrawLine(renderer,
                              knobRect.x + knobRect.w / 2,
@@ -171,7 +171,7 @@ private:
     // Level selection variables
     SDL_Texture* levelLockTexture;
     SDL_Rect levelRects[5];  // Array to store level button rectangles
-    
+
     // Volume control sliders
     Slider musicVolumeSlider;
     Slider sfxVolumeSlider;
@@ -182,19 +182,19 @@ private:
 public:
     MenuPanel(SDL_Renderer* renderer, int x, int y, int width, int height)
         : renderer(renderer), selectedIndex(0), backgroundTexture(nullptr),
-          x(x), y(y), width(width), height(height), lockTexture(nullptr), 
+          x(x), y(y), width(width), height(height), lockTexture(nullptr),
           levelLockTexture(nullptr), optionsTexture(nullptr), volumeTexture(nullptr), sfxTexture(nullptr)
     {
         // Load background texture
         backgroundTexture = IMG_LoadTexture(renderer, "F:\\Game\\graphic\\swingngrip.png");
-        
+
         // Initialize volume sliders with consistent positions
         musicVolumeSlider.setPosition(SCREEN_WIDTH/2 - 150, SCREEN_HEIGHT/2 - 40, 300, 20);
         sfxVolumeSlider.setPosition(SCREEN_WIDTH/2 - 150, SCREEN_HEIGHT/2 + 40, 300, 20);
-        
+
         // Load options title texture
         optionsTexture = IMG_LoadTexture(renderer, "F:\\Game\\graphic\\optionsbut.png");
-        
+
         // Load volume and sfx textures
         volumeTexture = IMG_LoadTexture(renderer, "F:\\Game\\graphic\\volume.png");
         sfxTexture = IMG_LoadTexture(renderer, "F:\\Game\\graphic\\sfx.png");
@@ -232,102 +232,97 @@ public:
             }
         }
     }
-    
+
     // Volume slider getters and setters
     void setMusicVolume(int volume) {
         musicVolumeSlider.setValue(volume);
     }
-    
+
     void setSfxVolume(int volume) {
         sfxVolumeSlider.setValue(volume);
     }
-    
+
     int getMusicVolume() const {
         return musicVolumeSlider.value;
     }
-    
+
     int getSfxVolume() const {
         return sfxVolumeSlider.value;
     }
-    
+
     // Handle volume slider events
     bool handleVolumeSliders(SDL_Event& event) {
         bool musicChanged = musicVolumeSlider.handleEvent(event);
         bool sfxChanged = sfxVolumeSlider.handleEvent(event);
         return musicChanged || sfxChanged;
     }
-    
+
     // Render options menu with volume sliders
     void renderOptions() {
         // Draw background
         SDL_SetRenderDrawColor(renderer, 245, 245, 220, 255);  // Beige color
         SDL_RenderClear(renderer);
-        
+
         // Draw title if texture is loaded
         if (optionsTexture) {
             int texWidth, texHeight;
             SDL_QueryTexture(optionsTexture, NULL, NULL, &texWidth, &texHeight);
-            
+
             // Calculate scaled dimensions to maintain aspect ratio
             int targetHeight = 120;
             int targetWidth = (int)((float)texWidth * targetHeight / texHeight);
-            
+
             SDL_Rect titleRect = {
                 (SCREEN_WIDTH - targetWidth) / 2,  // Center horizontally
                 30,
                 targetWidth,
                 targetHeight
             };
-            
+
             SDL_RenderCopy(renderer, optionsTexture, NULL, &titleRect);
-        } else {
-            // If texture failed to load, draw a text label
-            SDL_SetRenderDrawColor(renderer, 0, 0, 0, 255);
-            SDL_Rect titleRect = {SCREEN_WIDTH/2 - 150, 30, 300, 80};
-            SDL_RenderDrawRect(renderer, &titleRect);
         }
-        
+
         // Update slider positions
         musicVolumeSlider.setPosition(SCREEN_WIDTH/2 - 150, SCREEN_HEIGHT/2 - 40, 300, 20);
         sfxVolumeSlider.setPosition(SCREEN_WIDTH/2 - 150, SCREEN_HEIGHT/2 + 40, 300, 20);
-        
+
         // Render the sliders
         musicVolumeSlider.render(renderer);
         sfxVolumeSlider.render(renderer);
-        
+
         // Render the volume icon
         if (volumeTexture) {
             int texWidth, texHeight;
             SDL_QueryTexture(volumeTexture, NULL, NULL, &texWidth, &texHeight);
-            
+
             int iconHeight = 50;
             int iconWidth = (int)((float)texWidth * iconHeight / texHeight);
-            
+
             SDL_Rect iconRect = {
                 musicVolumeSlider.trackRect.x - iconWidth - 20,
                 musicVolumeSlider.trackRect.y - (iconHeight - musicVolumeSlider.trackRect.h) / 2,
                 iconWidth,
                 iconHeight
             };
-            
+
             SDL_RenderCopy(renderer, volumeTexture, NULL, &iconRect);
         }
-        
+
         // Render the sfx icon
         if (sfxTexture) {
             int texWidth, texHeight;
             SDL_QueryTexture(sfxTexture, NULL, NULL, &texWidth, &texHeight);
-            
+
             int iconHeight = 50;
             int iconWidth = (int)((float)texWidth * iconHeight / texHeight);
-            
+
             SDL_Rect iconRect = {
                 sfxVolumeSlider.trackRect.x - iconWidth - 20,
                 sfxVolumeSlider.trackRect.y - (iconHeight - sfxVolumeSlider.trackRect.h) / 2,
                 iconWidth,
                 iconHeight
             };
-            
+
             SDL_RenderCopy(renderer, sfxTexture, NULL, &iconRect);
         }
     }
@@ -370,32 +365,7 @@ public:
     }
 
     void handleEvent(SDL_Event& event) {
-        if (event.type == SDL_KEYDOWN) {
-            switch (event.key.keysym.scancode) {
-                case SDL_SCANCODE_UP:
-                    if (selectedIndex > 0) {
-                        items[selectedIndex].isSelected = false;
-                        selectedIndex--;
-                        items[selectedIndex].isSelected = true;
-                    }
-                    break;
-
-                case SDL_SCANCODE_DOWN:
-                    if (selectedIndex < items.size() - 1) {
-                        items[selectedIndex].isSelected = false;
-                        selectedIndex++;
-                        items[selectedIndex].isSelected = true;
-                    }
-                    break;
-
-                case SDL_SCANCODE_RETURN:
-                    if (items[selectedIndex].action) {
-                        items[selectedIndex].action();
-                    }
-                    break;
-            }
-        }
-        else if (event.type == SDL_MOUSEBUTTONDOWN) {
+        if (event.type == SDL_MOUSEBUTTONDOWN) {
             if (event.button.button == SDL_BUTTON_LEFT) {
                 // Get mouse position
                 int mouseX = event.button.x;
@@ -423,7 +393,7 @@ public:
             }
         }
     }
-
+// ve cai hinh nen con mau do do
     void render() {
         // Draw background on right side
         if (backgroundTexture) {
@@ -461,20 +431,6 @@ public:
 
         // Draw menu items (buttons) on left side
         for (const auto& item : items) {
-            if (item.isSelected) {
-                // Draw selection highlight
-                SDL_SetRenderDrawBlendMode(renderer, SDL_BLENDMODE_BLEND);
-                SDL_SetRenderDrawColor(renderer, 255, 255, 255, 100);
-                SDL_Rect highlightRect = {
-                    item.rect.x - 10,
-                    item.rect.y - 10,
-                    item.rect.w + 20,
-                    item.rect.h + 20
-                };
-                SDL_RenderFillRect(renderer, &highlightRect);
-                SDL_SetRenderDrawBlendMode(renderer, SDL_BLENDMODE_NONE);
-            }
-
             // Draw button texture
             SDL_RenderCopy(renderer, item.texture, NULL, &item.rect);
         }
@@ -500,7 +456,7 @@ public:
             // Scale up the dimensions
             int scaledWidth = texWidth * 1.5;  // 150% of original width
             int scaledHeight = texHeight * 1.5;  // 150% of original height
-
+// nay cho to hinh len vi ve be
             // Position at middle top of screen
             SDL_Rect destRect = {
                 (SCREEN_WIDTH - scaledWidth) / 2,  // Center horizontally
@@ -593,7 +549,7 @@ public:
         }
     }
 
-    // Add getters for the arrow and character rectangles
+    // handle event chuot trong main
     SDL_Rect getLeftArrowRect() const { return leftArrowRect; }
     SDL_Rect getRightArrowRect() const { return rightArrowRect; }
     SDL_Rect getCharacterRect() const { return characterRect; }
@@ -628,25 +584,20 @@ public:
         }
 
         // Calculate positions for level buttons with dynamic sizing
-        const int BASE_BUTTON_WIDTH = 200;  // Base width, will be adjusted to actual image size
-        const int BASE_BUTTON_HEIGHT = 200; // Base height, will be adjusted to actual image size
-        const int HORIZONTAL_SPACING = 100;
-        const int VERTICAL_SPACING = 100;
 
         // Pre-load all level textures to get their dimensions
         SDL_Texture* levelTextures[5];
         int actualWidths[5];
         int actualHeights[5];
-
+        const int BASE_BUTTON_WIDTH = 200;  // Base width, will be adjusted to actual image size
+        const int BASE_BUTTON_HEIGHT = 200; // Base height, will be adjusted to actual image size
+        const int HORIZONTAL_SPACING = 100;
+        const int VERTICAL_SPACING = 100;
         // Load all textures and get dimensions
         for (int i = 0; i < 5; i++) {
             levelTextures[i] = IMG_LoadTexture(renderer, levelPaths[i]);
             if (levelTextures[i]) {
                 SDL_QueryTexture(levelTextures[i], NULL, NULL, &actualWidths[i], &actualHeights[i]);
-            } else {
-                // Default sizes if loading fails
-                actualWidths[i] = BASE_BUTTON_WIDTH;
-                actualHeights[i] = BASE_BUTTON_HEIGHT;
             }
         }
 
@@ -654,14 +605,9 @@ public:
         int firstRowMaxHeight = 0;
         int secondRowMaxHeight = 0;
 
-        for (int i = 0; i < 3; i++) {
+        for (int i = 0; i < 5; i++) {
             if (levelTextures[i] && actualHeights[i] > firstRowMaxHeight)
                 firstRowMaxHeight = actualHeights[i];
-        }
-
-        for (int i = 3; i < 5; i++) {
-            if (levelTextures[i] && actualHeights[i] > secondRowMaxHeight)
-                secondRowMaxHeight = actualHeights[i];
         }
 
         // Ensure minimum height

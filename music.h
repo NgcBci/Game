@@ -16,6 +16,7 @@ private:
     int sfxVolume;    // Store current SFX volume (0-128)
 
 public:
+    // khai bao constructor
     Music() : gMusic(nullptr), grabSound(nullptr), fallSound(nullptr), applauseSound(nullptr),
               isGrabSoundPlaying(false), isFalling(false), hasPlayedApplause(false), respawnTime(0),
               musicVolume(MIX_MAX_VOLUME), sfxVolume(MIX_MAX_VOLUME) {}
@@ -24,11 +25,11 @@ public:
         gMusic = Mix_LoadMUS(path);
         return gMusic;
     }
-
+ // load am thanh
     void loadSound(const char* path) {
         grabSound = Mix_LoadWAV(path);
         if (grabSound != nullptr) {
-            grabSound->alen = 44100 * 2 * 2;
+            grabSound->alen = 44100 * 2 * 2; // cut xuong 1s
         }
     }
 
@@ -44,22 +45,19 @@ public:
         if (gMusic == nullptr) return;
 
         if (Mix_PlayingMusic() == 0) {
-            Mix_PlayMusic(gMusic, -1);
+            Mix_PlayMusic(gMusic, -1); // bg music loop vo tan
             setMusicVolume(musicVolume);
-        }
-        else if (Mix_PausedMusic() == 1) {
-            Mix_ResumeMusic();
         }
     }
 
     void playGrabSound() {
         if (grabSound != nullptr && !isGrabSoundPlaying) {
             int channel = Mix_PlayChannel(-1, grabSound, 0);
-            Mix_Volume(channel, sfxVolume);
+            Mix_Volume(channel, sfxVolume); // set volume according to sfx
             isGrabSoundPlaying = true;
             SDL_AddTimer(1000, [](Uint32 interval, void* param) -> Uint32 {
-                Music* music = static_cast<Music*>(param);
-                music->isGrabSoundPlaying = false;
+                Music* music = static_cast<Music*>(param); // cnay de play sound after 1 sec
+                music->isGrabSoundPlaying = false; // turn flag to false after 1 sec de no grab tiep
                 return 0;
             }, this);
         }
@@ -69,22 +67,17 @@ public:
         if (fallSound != nullptr) {
             Uint32 currentTime = SDL_GetTicks();
             bool isInRespawnCooldown = (currentTime - respawnTime) < RESPAWN_COOLDOWN;
-
+            // noi chung la de no play fall sound after cooldown
             if (isCurrentlyFalling && !isFalling && !isInRespawnCooldown) {
-                int channel = Mix_PlayChannel(-1, fallSound, 0);
+                int channel = Mix_PlayChannel(-1, fallSound, 0); // play khi tmoan dkien
                 Mix_Volume(channel, sfxVolume);
-                isFalling = true;
+                isFalling = true; // prevent playing agaain until reset
             }
             else if (!isCurrentlyFalling) {
-                isFalling = false;
+                isFalling = false; // ko roi nua nen set ve false
             }
         }
     }
-
-    void setRespawnTime() {
-        respawnTime = SDL_GetTicks();
-    }
-
     void playApplauseSound() {
         if (applauseSound != nullptr && !hasPlayedApplause) {
             int channel = Mix_PlayChannel(-1, applauseSound, 0);
@@ -92,21 +85,10 @@ public:
             hasPlayedApplause = true;
         }
     }
-
+   // vo tay xong reset
     void resetApplause() {
         hasPlayedApplause = false;
     }
-
-    void pause() {
-        if (Mix_PlayingMusic() == 1) {
-            Mix_PauseMusic();
-        }
-    }
-
-    void stop() {
-        Mix_HaltMusic();
-    }
-
     void setMusicVolume(int volume) {
         musicVolume = volume;
         Mix_VolumeMusic(musicVolume);
@@ -120,7 +102,7 @@ public:
             }
         }
     }
-
+ // nay de chinh trong options
     int getMusicVolume() const {
         return musicVolume;
     }
@@ -128,7 +110,7 @@ public:
     int getSfxVolume() const {
         return sfxVolume;
     }
-
+ // destructor
     ~Music() {
         if (gMusic != nullptr) {
             Mix_FreeMusic(gMusic);
@@ -148,3 +130,4 @@ public:
         }
     }
 };
+

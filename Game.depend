@@ -1,5 +1,5 @@
 # depslib dependency file v1.0
-1745166785 source:f:\game\main.cpp
+1745595868 source:f:\game\main.cpp
 	<SDL.h>
 	<SDL_image.h>
 	<SDL_mixer.h>
@@ -12,9 +12,9 @@
 	"music.h"
 	"level_platforms.h"
 
-1744512892 f:\game\defs.h
+1745313497 f:\game\defs.h
 
-1745166785 f:\game\graphics.h
+1745597652 f:\game\graphics.h
 	<SDL.h>
 	<SDL_image.h>
 	"defs.h"
@@ -23,7 +23,7 @@
 	<cstdlib>
 	<cstring>
 
-1745167317 f:\game\menupanel.h
+1745594473 f:\game\menupanel.h
 	<SDL_mixer.h>
 	<SDL.h>
 	<SDL_image.h>
@@ -37,7 +37,7 @@
 	<vector>
 	"defs.h"
 
-1745166785 f:\game\music.h
+1745594473 f:\game\music.h
 	<SDL_mixer.h>
 
 1744814947 f:\game\volumeslider.h
