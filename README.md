@@ -1,6 +1,6 @@
 # SWING AND GRIP 
 
-- [GAMEPLAY](#)
+- [GAMEPLAY](#): https://drive.google.com/drive/folders/1G0yIAu0itS8aAqZheoreO1OACEJ8kyN3?usp=drive_link
 
 ## GIỚI THIỆU GAME
 Swing and Grip là một dạng game platformer nhưng khác với những game platformer thông thường, nhân vật di chuyển bằng tay, bám vào các địa hình và đu người bay đến vạch đích để hoàn thành cuộc đua. Tuy nhiên trò chơi này sẽ không hề dễ dàng vì chỉ sơ sẩy một chút thôi bạn sẽ lập tức rơi tự do khỏi địa hình.
