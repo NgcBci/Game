@@ -15,7 +15,6 @@ Swing and Grip là một dạng game platformer nhưng khác với những game 
 - [7. MÃ NGUỒN](#7-mã-nguồn)
 - [8. ĐỒ HỌA](#8-đồ-họa)
 
-## CÁCH TẢI GAME
 ## 1. BẮT ĐẦU GAME 
 Nhấn vào start game để chơi game.  
 
