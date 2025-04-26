@@ -17,20 +17,38 @@ Swing and Grip là một dạng game platformer nhưng khác với những game 
 
 ## CÁCH TẢI GAME
 ## 1. BẮT ĐẦU GAME 
+Nhấn vào start game để chơi game.  
+
 ![main scr](forreadme/mainscr.png)
-Nhấn vào start game để chơi game. 
+
+Trong options có thể chỉnh âm lượng.
+
+![main scr](forreadme/opptionnz.png)
+
 ## 2. CHỌN NHÂN VẬT 
+
 Người chơi được cho sẵn nhân vật màu đỏ, chơi hết 1 màn sẽ unlock một nhân vật tiếp theo 
+
 ![CHAR1](forreadme/char2.png) 
+
 Sau khi chơi hết màn 1
+
 ![CHAR2](forreadme/char1.png)
+
 Sau khi chơi hết màn 2
+
 ![CHAR3](forreadme/char3.png)
+
 Sau khi chơi hết màn 3
+
 ![CHAR4](forreadme/char4.png)
+
 ## 3. CHỌN LEVEL
+
 Có 5 level để chơi với các loại chướng ngại vật khác nhau, phải vượt qua 1 level mới unlock được các level sau, nút back góc trên bên trái có thể back về màn hình trước đó cho bất cứ màn hình nào 
+
 ![lv](forreadme/chooselevel.png)
+
 ## 4. CÁC CHƯỚNG NGẠI VẬT CÓ THỂ GẶP TRONG GAME
 Chướng ngại hình vuông to trong level 1 
 
