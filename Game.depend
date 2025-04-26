@@ -14,7 +14,7 @@
 
 1745607836 f:\game\defs.h
 
-1745607835 f:\game\graphics.h
+1745622436 f:\game\graphics.h
 	<SDL.h>
 	<SDL_image.h>
 	"defs.h"
@@ -22,6 +22,7 @@
 	<cmath>
 	<cstdlib>
 	<cstring>
+	<SDL_mixer.h>
 
 1745594473 f:\game\menupanel.h
 	<SDL_mixer.h>

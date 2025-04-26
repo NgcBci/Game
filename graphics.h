@@ -7,6 +7,7 @@
 #include <cmath>
 #include <cstdlib> // For rand()
 #include <cstring> // For strstr()
+#include <SDL_mixer.h>
 
 using std::vector;
 
@@ -145,6 +146,11 @@ struct Graphics {
     void init() {
         if (SDL_Init(SDL_INIT_EVERYTHING) != 0)
             logErrorAndExit("SDL_Init", SDL_GetError());
+
+        // Initialize SDL_mixer
+        if (Mix_OpenAudio(44100, MIX_DEFAULT_FORMAT, 2, 2048) < 0) {
+            logErrorAndExit("Mix_OpenAudio", Mix_GetError());
+        }
 
         // Initialize SDL_image
         int imgFlags = IMG_INIT_PNG;
