@@ -91,7 +91,7 @@ Sau mỗi màn chơi sẽ có thông báo chúc mừng hoàn thành màn.
 
 ![p6](graphic/congrat.png)
 
-Sau khi hoàn thành cả 5 màn sẽ chiến thắng
+Sau khi hoàn thành cả 5 màn sẽ chiến thắng.
 
 ![p6](graphic/aced-Photoroom.png)
 
